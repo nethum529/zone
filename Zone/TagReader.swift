@@ -1,4 +1,4 @@
-import CoreNFC
+@preconcurrency import CoreNFC
 import Foundation
 
 enum TagReaderError: LocalizedError {
@@ -48,20 +48,23 @@ final class TagReader: NSObject, NFCTagReaderSessionDelegate, @unchecked Sendabl
 
     func tagReaderSession(_ session: NFCTagReaderSession, didDetect tags: [NFCTag]) {
         guard let tag = tags.first else { return }
+        guard let id = Self.identifier(of: tag) else {
+            session.invalidate(errorMessage: TagReaderError.unsupportedTag.localizedDescription)
+            finish(.failure(TagReaderError.unsupportedTag))
+            return
+        }
+        // The completion handler is Sendable, so it gets the session from self
+        // and does not capture the session or the tag.
         session.connect(to: tag) { [weak self] error in
+            guard let self, let session = self.session else { return }
             if let error {
                 session.invalidate(errorMessage: "Could not read the tag. Try again.")
-                self?.finish(.failure(error))
-                return
-            }
-            guard let id = Self.identifier(of: tag) else {
-                session.invalidate(errorMessage: TagReaderError.unsupportedTag.localizedDescription)
-                self?.finish(.failure(TagReaderError.unsupportedTag))
+                self.finish(.failure(error))
                 return
             }
             session.alertMessage = "Tag read."
             session.invalidate()
-            self?.finish(.success(id))
+            self.finish(.success(id))
         }
     }
 

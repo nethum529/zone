@@ -8,7 +8,6 @@ import Observation
 @MainActor
 @Observable
 final class ZoneStore {
-    static let appGroup = "group.com.nethum.zone"
     static let emergencyExitLimit = 3
 
     private(set) var authorization: AuthorizationStatus
@@ -37,7 +36,7 @@ final class ZoneStore {
     }
 
     init() {
-        let defaults = UserDefaults(suiteName: Self.appGroup) ?? .standard
+        let defaults = UserDefaults.standard
         self.defaults = defaults
         authorization = AuthorizationCenter.shared.authorizationStatus
         registeredTagID = defaults.string(forKey: Keys.tagID)
