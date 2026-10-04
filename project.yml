@@ -1,0 +1,32 @@
+name: Zone
+options:
+  bundleIdPrefix: com.nethum
+  deploymentTarget:
+    iOS: "18.0"
+settings:
+  base:
+    DEVELOPMENT_TEAM: NYKPX446L9
+    CODE_SIGN_STYLE: Automatic
+    SWIFT_VERSION: "6.0"
+targets:
+  Zone:
+    type: application
+    platform: iOS
+    sources: [Zone]
+    entitlements:
+      path: Zone/Zone.entitlements
+      properties:
+        com.apple.developer.family-controls: true
+        com.apple.developer.nfc.readersession.formats: [TAG]
+        com.apple.security.application-groups: [group.com.nethum.zone]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.nethum.zone
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: Zone
+        INFOPLIST_KEY_NFCReaderUsageDescription: Zone reads your tag to start and end a session.
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
+        INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
+        MARKETING_VERSION: "0.1"
+        CURRENT_PROJECT_VERSION: "1"
