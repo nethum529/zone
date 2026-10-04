@@ -43,7 +43,6 @@ private struct MainView: View {
     @Environment(ZoneStore.self) private var store
     @State private var tagReader = TagReader()
     @State private var showingPicker = false
-    @State private var showingEmergencyConfirm = false
     @State private var errorMessage: String?
 
     var body: some View {
@@ -69,25 +68,9 @@ private struct MainView: View {
             }
             Button(pickerLabel) { showingPicker = true }
                 .disabled(store.isZoned)
-            if store.isZoned {
-                Button("Emergency exit (\(store.emergencyExitsLeft) left)", role: .destructive) {
-                    showingEmergencyConfirm = true
-                }
-                .disabled(store.emergencyExitsLeft == 0)
-                .font(.footnote)
-            }
         }
         .padding(32)
         .familyActivityPicker(isPresented: $showingPicker, selection: $store.selection)
-        .confirmationDialog(
-            "Leave without your tag?",
-            isPresented: $showingEmergencyConfirm,
-            titleVisibility: .visible
-        ) {
-            Button("Use an emergency exit", role: .destructive) { store.emergencyExit() }
-        } message: {
-            Text("You have \(store.emergencyExitsLeft) emergency exits left. They do not come back.")
-        }
         .alert("Zone", isPresented: .constant(errorMessage != nil)) {
             Button("OK") { errorMessage = nil }
         } message: {

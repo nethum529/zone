@@ -8,12 +8,9 @@ import Observation
 @MainActor
 @Observable
 final class ZoneStore {
-    static let emergencyExitLimit = 3
-
     private(set) var authorization: AuthorizationStatus
     private(set) var registeredTagID: String?
     private(set) var zonedSince: Date?
-    private(set) var emergencyExitsLeft: Int
     var selection: FamilyActivitySelection {
         didSet { save(selection, forKey: Keys.selection) }
     }
@@ -32,7 +29,6 @@ final class ZoneStore {
         static let selection = "selection"
         static let tagID = "tagID"
         static let zonedSince = "zonedSince"
-        static let emergencyExitsLeft = "emergencyExitsLeft"
     }
 
     init() {
@@ -41,8 +37,6 @@ final class ZoneStore {
         authorization = AuthorizationCenter.shared.authorizationStatus
         registeredTagID = defaults.string(forKey: Keys.tagID)
         zonedSince = defaults.object(forKey: Keys.zonedSince) as? Date
-        emergencyExitsLeft = defaults.object(forKey: Keys.emergencyExitsLeft) as? Int
-            ?? Self.emergencyExitLimit
         selection = Self.load(FamilyActivitySelection.self, from: defaults, forKey: Keys.selection)
             ?? FamilyActivitySelection()
     }
@@ -73,13 +67,6 @@ final class ZoneStore {
     func leaveZone() {
         shields.clearAllSettings()
         setZonedSince(nil)
-    }
-
-    func emergencyExit() {
-        guard emergencyExitsLeft > 0 else { return }
-        emergencyExitsLeft -= 1
-        defaults.set(emergencyExitsLeft, forKey: Keys.emergencyExitsLeft)
-        leaveZone()
     }
 
     private func applyShields() {
