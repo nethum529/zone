@@ -22,6 +22,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.nethum.zone
         GENERATE_INFOPLIST_FILE: YES
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         INFOPLIST_KEY_CFBundleDisplayName: Zone
         INFOPLIST_KEY_NFCReaderUsageDescription: Zone reads your tag to start and end a session.
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
