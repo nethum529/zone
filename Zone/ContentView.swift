@@ -7,7 +7,7 @@ struct ContentView: View {
 
     var body: some View {
         if store.authorization == .approved {
-            MainView()
+            NavigationStack { MainView() }
         } else {
             OnboardingView()
         }
@@ -83,6 +83,12 @@ private struct MainView: View {
             }
         }
         .padding(32)
+        .toolbar {
+            NavigationLink { StatsView() } label: {
+                Image(systemName: "chart.bar")
+            }
+            .accessibilityLabel("Stats")
+        }
         .onChange(of: scenePhase) {
             if scenePhase == .active { store.refresh() }
         }

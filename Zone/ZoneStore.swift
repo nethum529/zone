@@ -13,6 +13,8 @@ final class ZoneStore {
     private(set) var zonedSince: Date?
     // In Super Zone, the time when Zone locks again after the user leaves.
     private(set) var relockAt: Date?
+    // Finished sessions, oldest first.
+    private(set) var sessions: [ZoneSession]
     var superZone: Bool {
         didSet { defaults.set(superZone, forKey: Keys.superZone) }
     }
@@ -36,6 +38,8 @@ final class ZoneStore {
         registeredTagID = defaults.string(forKey: Keys.tagID)
         superZone = defaults.bool(forKey: Keys.superZone)
         selection = ZoneLock.selection
+        sessions = defaults.data(forKey: Keys.sessions)
+            .flatMap { try? JSONDecoder().decode([ZoneSession].self, from: $0) } ?? []
         refresh()
     }
 
@@ -73,7 +77,17 @@ final class ZoneStore {
         refresh()
     }
 
+    // The finished sessions and the current one up to now.
+    func sessions(at now: Date) -> [ZoneSession] {
+        guard let zonedSince else { return sessions }
+        return sessions + [ZoneSession(start: zonedSince, end: now)]
+    }
+
     func leaveZone() {
+        if let zonedSince {
+            sessions.append(ZoneSession(start: zonedSince, end: .now))
+            defaults.set(try? JSONEncoder().encode(sessions), forKey: Keys.sessions)
+        }
         ZoneLock.shields.clearAllSettings()
         defaults.removeObject(forKey: Keys.zonedSince)
         if superZone {

@@ -19,6 +19,7 @@ enum ZoneLock {
         static let zonedSince = "zonedSince"
         static let superZone = "superZone"
         static let relockAt = "relockAt"
+        static let sessions = "sessions"
     }
 
     static var selection: FamilyActivitySelection {
