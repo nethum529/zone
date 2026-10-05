@@ -12,12 +12,15 @@ targets:
   Zone:
     type: application
     platform: iOS
-    sources: [Zone]
+    sources: [Zone, Shared]
+    dependencies:
+      - target: ZoneMonitor
     entitlements:
       path: Zone/Zone.entitlements
       properties:
         com.apple.developer.family-controls: true
         com.apple.developer.nfc.readersession.formats: [TAG]
+        com.apple.security.application-groups: [group.com.nethum.zone]
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.nethum.zone
@@ -29,5 +32,28 @@ targets:
         INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
         INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
         INFOPLIST_KEY_UIRequiresFullScreen: YES
+        MARKETING_VERSION: "0.1"
+        CURRENT_PROJECT_VERSION: "1"
+  ZoneMonitor:
+    type: app-extension
+    platform: iOS
+    sources: [ZoneMonitor, Shared]
+    entitlements:
+      path: ZoneMonitor/ZoneMonitor.entitlements
+      properties:
+        com.apple.developer.family-controls: true
+        com.apple.security.application-groups: [group.com.nethum.zone]
+    info:
+      path: ZoneMonitor/Info.plist
+      properties:
+        CFBundleDisplayName: Zone Monitor
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.deviceactivity.monitor-extension
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).ZoneMonitor
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.nethum.zone.monitor
         MARKETING_VERSION: "0.1"
         CURRENT_PROJECT_VERSION: "1"

@@ -41,6 +41,7 @@ private struct OnboardingView: View {
 
 private struct MainView: View {
     @Environment(ZoneStore.self) private var store
+    @Environment(\.scenePhase) private var scenePhase
     @State private var tagReader = TagReader()
     @State private var showingPicker = false
     @State private var errorMessage: String?
@@ -60,16 +61,38 @@ private struct MainView: View {
                     .foregroundStyle(.secondary)
             } else {
                 Button(store.isZoned ? "Leave the Zone" : "Enter the Zone") {
-                    Task { await toggleZone() }
+                    if store.isZoned {
+                        Task { await leaveZone() }
+                    } else {
+                        withAnimation { store.enterZone() }
+                    }
                 }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.large)
                 .disabled(!store.isZoned && !store.hasBlockedItems)
             }
             Button(pickerLabel) { showingPicker = true }
-                .disabled(store.isZoned)
+                .disabled(store.isZoned || store.relockAt != nil)
+            VStack(spacing: 4) {
+                Toggle("Super Zone", isOn: $store.superZone)
+                    .disabled(store.relockAt != nil)
+                Text("When you leave, Zone locks again after 15 minutes.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
         }
         .padding(32)
+        .onChange(of: scenePhase) {
+            if scenePhase == .active { store.refresh() }
+        }
+        .task(id: store.relockAt) {
+            // Lock on time when the app is open.
+            guard let relockAt = store.relockAt else { return }
+            try? await Task.sleep(for: .seconds(max(0, relockAt.timeIntervalSinceNow)))
+            guard !Task.isCancelled else { return }
+            withAnimation { store.refresh() }
+        }
         .familyActivityPicker(isPresented: $showingPicker, selection: $store.selection)
         .alert("Zone", isPresented: .constant(errorMessage != nil)) {
             Button("OK") { errorMessage = nil }
@@ -88,6 +111,10 @@ private struct MainView: View {
                 .font(.largeTitle.bold())
             if let since = store.zonedSince {
                 Text(since, style: .timer)
+                    .font(.title2.monospacedDigit())
+                    .foregroundStyle(.secondary)
+            } else if let relockAt = store.relockAt {
+                Text("Locks again in \(Text(relockAt, style: .timer))")
                     .font(.title2.monospacedDigit())
                     .foregroundStyle(.secondary)
             }
@@ -110,16 +137,14 @@ private struct MainView: View {
         }
     }
 
-    private func toggleZone() async {
+    private func leaveZone() async {
         do {
             let id = try await tagReader.scan(prompt: "Hold your phone near your Zone tag.")
             guard store.isRegisteredTag(id) else {
                 errorMessage = "That is not your Zone tag."
                 return
             }
-            withAnimation {
-                if store.isZoned { store.leaveZone() } else { store.enterZone() }
-            }
+            withAnimation { store.leaveZone() }
         } catch {
             show(error)
         }

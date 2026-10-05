@@ -1,6 +1,6 @@
+import DeviceActivity
 import FamilyControls
 import Foundation
-import ManagedSettings
 import Observation
 
 // Holds the app state and turns the shields on and off.
@@ -11,8 +11,13 @@ final class ZoneStore {
     private(set) var authorization: AuthorizationStatus
     private(set) var registeredTagID: String?
     private(set) var zonedSince: Date?
+    // In Super Zone, the time when Zone locks again after the user leaves.
+    private(set) var relockAt: Date?
+    var superZone: Bool {
+        didSet { defaults.set(superZone, forKey: Keys.superZone) }
+    }
     var selection: FamilyActivitySelection {
-        didSet { save(selection, forKey: Keys.selection) }
+        didSet { defaults.set(try? JSONEncoder().encode(selection), forKey: Keys.selection) }
     }
 
     var isZoned: Bool { zonedSince != nil }
@@ -22,23 +27,26 @@ final class ZoneStore {
             || !selection.webDomainTokens.isEmpty
     }
 
-    private let defaults: UserDefaults
-    private let shields = ManagedSettingsStore(named: .init("zone"))
-
-    private enum Keys {
-        static let selection = "selection"
-        static let tagID = "tagID"
-        static let zonedSince = "zonedSince"
-    }
+    private typealias Keys = ZoneLock.Keys
+    private let defaults = ZoneLock.defaults
+    private let activityCenter = DeviceActivityCenter()
 
     init() {
-        let defaults = UserDefaults.standard
-        self.defaults = defaults
         authorization = AuthorizationCenter.shared.authorizationStatus
         registeredTagID = defaults.string(forKey: Keys.tagID)
+        superZone = defaults.bool(forKey: Keys.superZone)
+        selection = ZoneLock.selection
+        refresh()
+    }
+
+    // Reads the lock state again, because the monitor extension can change it.
+    // If the relock time passed and the extension did not lock, lock now.
+    func refresh() {
         zonedSince = defaults.object(forKey: Keys.zonedSince) as? Date
-        selection = Self.load(FamilyActivitySelection.self, from: defaults, forKey: Keys.selection)
-            ?? FamilyActivitySelection()
+        relockAt = defaults.object(forKey: Keys.relockAt) as? Date
+        if !isZoned, let relockAt, relockAt <= .now {
+            enterZone()
+        }
     }
 
     func requestAuthorization() async {
@@ -60,38 +68,35 @@ final class ZoneStore {
     }
 
     func enterZone() {
-        applyShields()
-        setZonedSince(.now)
+        activityCenter.stopMonitoring([ZoneLock.relockActivity])
+        ZoneLock.lock()
+        refresh()
     }
 
     func leaveZone() {
-        shields.clearAllSettings()
-        setZonedSince(nil)
+        ZoneLock.shields.clearAllSettings()
+        defaults.removeObject(forKey: Keys.zonedSince)
+        if superZone {
+            scheduleRelock()
+        }
+        refresh()
     }
 
-    private func applyShields() {
-        let apps = selection.applicationTokens
-        let categories = selection.categoryTokens
-        let domains = selection.webDomainTokens
-        shields.shield.applications = apps.isEmpty ? nil : apps
-        shields.shield.applicationCategories = categories.isEmpty ? nil : .specific(categories)
-        shields.shield.webDomains = domains.isEmpty ? nil : domains
-        shields.shield.webDomainCategories = categories.isEmpty ? nil : .specific(categories)
-        // Stop the user from deleting apps to get around the shields.
-        shields.application.denyAppRemoval = true
-    }
-
-    private func setZonedSince(_ date: Date?) {
-        zonedSince = date
-        defaults.set(date, forKey: Keys.zonedSince)
-    }
-
-    private func save<T: Encodable>(_ value: T, forKey key: String) {
-        defaults.set(try? JSONEncoder().encode(value), forKey: key)
-    }
-
-    private static func load<T: Decodable>(_ type: T.Type, from defaults: UserDefaults, forKey key: String) -> T? {
-        guard let data = defaults.data(forKey: key) else { return nil }
-        return try? JSONDecoder().decode(type, from: data)
+    private func scheduleRelock() {
+        let start = Date.now
+        let end = start.addingTimeInterval(ZoneLock.relockDelay)
+        let parts: Set<Calendar.Component> = [.year, .month, .day, .hour, .minute, .second]
+        let schedule = DeviceActivitySchedule(
+            intervalStart: Calendar.current.dateComponents(parts, from: start),
+            intervalEnd: Calendar.current.dateComponents(parts, from: end),
+            repeats: false
+        )
+        defaults.set(end, forKey: Keys.relockAt)
+        do {
+            try activityCenter.startMonitoring(ZoneLock.relockActivity, during: schedule)
+        } catch {
+            // refresh() still locks the next time the app opens.
+            print("Could not schedule the relock: \(error)")
+        }
     }
 }
