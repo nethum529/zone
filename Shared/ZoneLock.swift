@@ -40,8 +40,6 @@ enum ZoneLock {
         shields.shield.applicationCategories = categories.isEmpty ? nil : .specific(categories)
         shields.shield.webDomains = domains.isEmpty ? nil : domains
         shields.shield.webDomainCategories = categories.isEmpty ? nil : .specific(categories)
-        // Stop the user from deleting apps to get around the shields.
-        shields.application.denyAppRemoval = true
         defaults.set(Date.now, forKey: Keys.zonedSince)
         defaults.removeObject(forKey: Keys.relockAt)
     }
