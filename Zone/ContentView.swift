@@ -73,6 +73,11 @@ private struct MainView: View {
             }
             Button(pickerLabel) { showingPicker = true }
                 .disabled(store.isZoned || store.relockAt != nil)
+            if store.registeredTagID != nil {
+                // Only when unlocked, so a new tag cannot be used to leave the Zone.
+                Button("Change tag") { Task { await registerTag() } }
+                    .disabled(store.isZoned || store.relockAt != nil)
+            }
             VStack(spacing: 4) {
                 Toggle("Super Zone", isOn: $store.superZone)
                     .disabled(store.relockAt != nil)
