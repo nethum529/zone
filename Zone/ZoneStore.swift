@@ -18,6 +18,11 @@ final class ZoneStore {
     var superZone: Bool {
         didSet { defaults.set(superZone, forKey: Keys.superZone) }
     }
+    // iOS does not monitor an activity shorter than 15 minutes.
+    static let relockChoices = [15, 30, 45, 60, 90, 120]
+    var relockMinutes: Int {
+        didSet { defaults.set(relockMinutes, forKey: Keys.relockMinutes) }
+    }
     var selection: FamilyActivitySelection {
         didSet { defaults.set(try? JSONEncoder().encode(selection), forKey: Keys.selection) }
     }
@@ -37,6 +42,7 @@ final class ZoneStore {
         authorization = AuthorizationCenter.shared.authorizationStatus
         registeredTagID = defaults.string(forKey: Keys.tagID)
         superZone = defaults.bool(forKey: Keys.superZone)
+        relockMinutes = defaults.object(forKey: Keys.relockMinutes) as? Int ?? Self.relockChoices[0]
         selection = ZoneLock.selection
         sessions = defaults.data(forKey: Keys.sessions)
             .flatMap { try? JSONDecoder().decode([ZoneSession].self, from: $0) } ?? []
@@ -98,7 +104,7 @@ final class ZoneStore {
 
     private func scheduleRelock() {
         let start = Date.now
-        let end = start.addingTimeInterval(ZoneLock.relockDelay)
+        let end = start.addingTimeInterval(TimeInterval(relockMinutes * 60))
         let parts: Set<Calendar.Component> = [.year, .month, .day, .hour, .minute, .second]
         let schedule = DeviceActivitySchedule(
             intervalStart: Calendar.current.dateComponents(parts, from: start),

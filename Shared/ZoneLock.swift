@@ -11,7 +11,6 @@ enum ZoneLock {
 
     // In Super Zone, the extension locks again when this activity ends.
     static var relockActivity: DeviceActivityName { DeviceActivityName("relock") }
-    static let relockDelay: TimeInterval = 15 * 60
 
     enum Keys {
         static let selection = "selection"
@@ -19,6 +18,7 @@ enum ZoneLock {
         static let zonedSince = "zonedSince"
         static let superZone = "superZone"
         static let relockAt = "relockAt"
+        static let relockMinutes = "relockMinutes"
         static let sessions = "sessions"
     }
 

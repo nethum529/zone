@@ -80,12 +80,18 @@ private struct MainView: View {
             }
             VStack(spacing: 4) {
                 Toggle("Super Zone", isOn: $store.superZone)
-                    .disabled(store.relockAt != nil)
-                Text("When you leave, Zone locks again after 15 minutes.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                HStack {
+                    Text("Locks again after you leave")
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Picker("Locks again after you leave", selection: $store.relockMinutes) {
+                        ForEach(ZoneStore.relockChoices, id: \.self) { Text("\($0) min") }
+                    }
+                    .labelsHidden()
+                }
+                .font(.footnote)
             }
+            .disabled(store.relockAt != nil)
         }
         .padding(32)
         .toolbar {
