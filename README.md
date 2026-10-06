@@ -16,13 +16,50 @@ Zone is an app blocker for iPhone. Tap a button to enter the Zone, and the apps 
 - Super Zone locks again some minutes after you leave, also when the app is closed.
 - Analytics shows your time in the Zone for each day of the month and for the last 7 days. Tap a day to see its total.
 
-## Build
+## Install
 
-Zone needs Xcode, XcodeGen and a paid Apple developer account (Screen Time and NFC need it).
+### TestFlight (coming soon)
+
+The TestFlight link comes here soon.
+
+1. Install [TestFlight](https://apps.apple.com/app/testflight/id899247664) from the App Store.
+2. Open the Zone TestFlight link on your iPhone and tap Install.
+
+Updates: TestFlight installs new versions for you. If it does not, open TestFlight and tap Update.
+
+### Build from source
+
+You need a Mac with Xcode, [XcodeGen](https://github.com/yonaskolb/XcodeGen) (`brew install xcodegen`) and a paid Apple developer account. A free Apple ID cannot use Screen Time controls.
+
+1. Get the code:
+
+   ```sh
+   git clone https://github.com/nethum529/zone.git
+   cd zone
+   ```
+
+2. Use your own team ID and bundle ID prefix. Find your team ID in the [developer account](https://developer.apple.com/account) under Membership details.
+
+   ```sh
+   sed -i '' 's/NYKPX446L9/YOUR_TEAM_ID/; s/com\.nethum/com.yourname/g' project.yml Shared/ZoneLock.swift
+   ```
+
+3. Make the project and open it:
+
+   ```sh
+   xcodegen generate
+   open Zone.xcodeproj
+   ```
+
+4. Connect your iPhone, select it at the top of Xcode, and press Run (Cmd+R).
+
+Updates:
 
 ```sh
+git pull --autostash
 xcodegen generate
-open Zone.xcodeproj
 ```
+
+Then press Run in Xcode again. Your Zone data stays on the phone.
 
 Icons are from [Phosphor](https://phosphoricons.com) (MIT).
