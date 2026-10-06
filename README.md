@@ -18,12 +18,12 @@ Zone is an app blocker for iPhone. Tap a button to enter the Zone, and the apps 
 
 ## Install
 
-### TestFlight (coming soon)
+### TestFlight
 
-The TestFlight link comes here soon.
+You need an NFC tag, for example an NTAG213 sticker.
 
 1. Install [TestFlight](https://apps.apple.com/app/testflight/id899247664) from the App Store.
-2. Open the Zone TestFlight link on your iPhone and tap Install.
+2. On your iPhone, open https://testflight.apple.com/join/kjdW6w6b and tap Install.
 
 Updates: TestFlight installs new versions for you. If it does not, open TestFlight and tap Update.
 
