@@ -39,15 +39,22 @@ private extension View {
     }
 }
 
+private let bubbleAnimation = Animation.smooth(duration: 0.3)
+
 private extension View {
     // The bubble is a tooltip: it goes away by itself.
     func hidesSelection(_ selected: Binding<Date?>) -> some View {
         task(id: selected.wrappedValue) {
             guard selected.wrappedValue != nil,
-                  (try? await Task.sleep(for: .seconds(2))) != nil
+                  (try? await Task.sleep(for: .seconds(1.5))) != nil
             else { return }
-            withAnimation(.easeOut(duration: 0.15)) { selected.wrappedValue = nil }
+            withAnimation(bubbleAnimation) { selected.wrappedValue = nil }
         }
+    }
+
+    // Grows out of the day it points at. With reduced motion it only fades.
+    func bubbleTransition(reduceMotion: Bool) -> some View {
+        transition(reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.8, anchor: .bottom)))
     }
 }
 
@@ -104,6 +111,7 @@ private struct Bubble: View {
 private struct MonthPage: View {
     let stats: ZoneStats
     @State private var selected: Date?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private let calendar = Calendar.current
 
@@ -159,7 +167,8 @@ private struct MonthPage: View {
         let future = item.day > stats.now
         let isSelected = item.day == selected
         let isToday = calendar.isDate(item.day, inSameDayAs: stats.now)
-        let alignment: Alignment = column == 0 ? .topLeading : column == 6 ? .topTrailing : .top
+        // The bubble stays inside the screen at the first and last column.
+        let alignment: Alignment = column == 0 ? .bottomLeading : column == 6 ? .bottomTrailing : .bottom
         return RoundedRectangle(cornerRadius: 8)
             .fill(fill(item.time, future: future))
             .aspectRatio(1, contentMode: .fit)
@@ -169,16 +178,22 @@ private struct MonthPage: View {
                 }
             }
             .opacity(selected == nil || isSelected ? 1 : 0.35)
-            .overlay(alignment: alignment) {
-                if isSelected {
-                    Bubble(day: item.day, time: item.time)
-                        .alignmentGuide(.top) { $0[.bottom] + 6 }
-                }
+            .overlay(alignment: .top) {
+                // A line on the top edge of the square, so the bubble sits above it.
+                Color.clear
+                    .frame(height: 0)
+                    .overlay(alignment: alignment) {
+                        if isSelected {
+                            Bubble(day: item.day, time: item.time)
+                                .padding(.bottom, 6)
+                                .bubbleTransition(reduceMotion: reduceMotion)
+                        }
+                    }
             }
             .contentShape(.rect)
             .onTapGesture {
                 guard !future else { return }
-                withAnimation(.easeOut(duration: 0.1)) { selected = isSelected ? nil : item.day }
+                withAnimation(bubbleAnimation) { selected = isSelected ? nil : item.day }
             }
             .accessibilityElement()
             .accessibilityLabel(item.day.formatted(date: .complete, time: .omitted))
@@ -201,6 +216,7 @@ private struct MonthPage: View {
 private struct WeekPage: View {
     let stats: ZoneStats
     @State private var selected: Date?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         let days = stats.lastDays(7)
@@ -219,11 +235,6 @@ private struct WeekPage: View {
                     .foregroundStyle(Color.zoneBone)
                     .clipShape(UnevenRoundedRectangle(topLeadingRadius: 5, bottomLeadingRadius: 2, bottomTrailingRadius: 2, topTrailingRadius: 5))
                     .opacity(selected == nil || selected == item.day ? 1 : 0.35)
-                    .annotation(position: .top, spacing: 6, overflowResolution: .init(x: .fit(to: .chart), y: .disabled)) {
-                        if selected == item.day {
-                            Bubble(day: item.day, time: item.time)
-                        }
-                    }
                 }
                 RuleMark(y: .value("Average", average / 3600))
                     .foregroundStyle(Color.zoneBone.opacity(0.5))
@@ -248,8 +259,22 @@ private struct WeekPage: View {
                             guard let date: Date = proxy.value(atX: x) else { return }
                             let day = Calendar.current.startOfDay(for: date)
                             guard days.contains(where: { $0.day == day }) else { return }
-                            withAnimation(.easeOut(duration: 0.1)) { selected = selected == day ? nil : day }
+                            withAnimation(bubbleAnimation) { selected = selected == day ? nil : day }
                         }
+                    if let selected, let item = days.first(where: { $0.day == selected }), let plot = proxy.plotFrame,
+                       let x = proxy.position(forX: selected.addingTimeInterval(12 * 3600)),
+                       let y = proxy.position(forY: item.time / 3600) {
+                        let frame = geo[plot]
+                        // A point on top of the bar. The bubble sits above it and stays inside the chart.
+                        Color.clear
+                            .frame(width: 0, height: 0)
+                            .overlay(alignment: .bottom) {
+                                Bubble(day: item.day, time: item.time)
+                                    .padding(.bottom, 6)
+                            }
+                            .offset(x: frame.minX + min(max(x, 48), frame.width - 48), y: frame.minY + y)
+                            .bubbleTransition(reduceMotion: reduceMotion)
+                    }
                 }
             }
             .frame(maxHeight: .infinity)

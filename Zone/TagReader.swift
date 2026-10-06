@@ -31,7 +31,22 @@ final class TagReader: NSObject, NFCTagReaderSessionDelegate, @unchecked Sendabl
             throw TagReaderError.unavailable
             #endif
         }
-        return try await withCheckedThrowingContinuation { continuation in
+        // Right after a scan sheet closes, the reader is busy for a moment.
+        // A new scan then fails at once with "System resource unavailable", so wait and try again.
+        var attempt = 1
+        while true {
+            do {
+                return try await read(prompt: prompt)
+            } catch let error as NFCReaderError where error.code == .readerSessionInvalidationErrorSystemIsBusy && attempt < 5 {
+                attempt += 1
+                try await Task.sleep(for: .milliseconds(400))
+            }
+        }
+    }
+
+    @MainActor
+    private func read(prompt: String) async throws -> String {
+        try await withCheckedThrowingContinuation { continuation in
             self.continuation = continuation
             let session = NFCTagReaderSession(pollingOption: [.iso14443, .iso15693], delegate: self, queue: nil)
             session?.alertMessage = prompt

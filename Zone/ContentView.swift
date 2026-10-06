@@ -82,14 +82,20 @@ private struct MainView: View {
 final class TagScanner {
     var errorMessage: String?
     private let reader = TagReader()
+    private var isScanning = false
 
     // Returns nil when the scan failed or the user closed the scan sheet.
     func scan() async -> String? {
+        // A second tap while a scan runs does nothing.
+        guard !isScanning else { return nil }
+        isScanning = true
+        defer { isScanning = false }
         do {
             return try await reader.scan(prompt: "Hold your phone near your Zone tag.")
         } catch {
-            // The user closed the scan sheet. This is not an error to show.
-            if let nfcError = error as? NFCReaderError, nfcError.code == .readerSessionInvalidationErrorUserCanceled {
+            // The user closed the scan sheet, or it closed by itself. The sheet already showed this.
+            if let nfcError = error as? NFCReaderError,
+               [.readerSessionInvalidationErrorUserCanceled, .readerSessionInvalidationErrorSessionTimeout].contains(nfcError.code) {
                 return nil
             }
             errorMessage = error.localizedDescription

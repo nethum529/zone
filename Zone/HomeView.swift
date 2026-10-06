@@ -3,6 +3,10 @@ import SwiftUI
 struct HomeView: View {
     @Environment(ZoneStore.self) private var store
     @State private var scanner = TagScanner()
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    // Entering and leaving the Zone.
+    private let change = Animation.smooth(duration: 0.6)
 
     var body: some View {
         VStack(spacing: 0) {
@@ -11,7 +15,7 @@ struct HomeView: View {
                 status(at: context.date)
             }
             .padding(.horizontal, 24)
-            .padding(.top, 36)
+            .padding(.top, 24)
             Spacer()
             action
                 .padding(.horizontal, 24)
@@ -36,16 +40,21 @@ struct HomeView: View {
                         Capsule()
                             .fill(Color.zoneInk)
                             .frame(width: geo.size.width * barFraction(at: now))
+                            .animation(change, value: barFraction(at: now))
                     }
             }
             .frame(height: 4)
             .padding(.top, 26)
             VStack(spacing: 0) {
                 if let since = store.zonedSince {
-                    row("Session start", since.formatted(date: .omitted, time: .shortened))
-                    row("Total today", zoneTimeText(stats.today))
+                    Group {
+                        row("Session start", since.formatted(date: .omitted, time: .shortened))
+                        row("Total today", zoneTimeText(stats.today))
+                    }
+                    .transition(enterExit)
                 } else if let relockAt = store.relockAt {
                     row("Locks again in", zoneTimeText((max(0, relockAt.timeIntervalSince(now)) / 60).rounded(.up) * 60))
+                        .transition(enterExit)
                 }
             }
             .padding(.top, 14)
@@ -53,21 +62,24 @@ struct HomeView: View {
     }
 
     private func bigTime(_ time: TimeInterval) -> some View {
-        let minutes = Int(time) / 60
-        return VStack(alignment: .leading, spacing: -41) {
-            bigLine("\(minutes / 60)", unit: "h")
-            bigLine(String(format: "%02d", minutes % 60), unit: "m")
+        let seconds = Int(time)
+        return VStack(alignment: .leading, spacing: -33) {
+            bigLine("\(seconds / 3600)", unit: "h")
+            bigLine(String(format: "%02d", seconds / 60 % 60), unit: "m")
+            bigLine(String(format: "%02d", seconds % 60), unit: "s")
         }
+        .animation(.smooth(duration: 0.4), value: seconds)
     }
 
     private func bigLine(_ number: String, unit: String) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 4) {
             Text(number)
-                .font(.system(size: 150, weight: .bold))
-                .tracking(-7)
+                .contentTransition(.numericText())
+                .font(.system(size: 120, weight: .bold))
+                .tracking(-5)
                 .monospacedDigit()
             Text(unit)
-                .font(.system(size: 46, weight: .semibold))
+                .font(.system(size: 38, weight: .semibold))
                 .foregroundStyle(Color.zoneMute)
         }
         .lineLimit(1)
@@ -94,33 +106,36 @@ struct HomeView: View {
         .frame(height: 30)
     }
 
-    @ViewBuilder
+    private var enterExit: AnyTransition {
+        reduceMotion ? .opacity : .opacity.combined(with: .offset(y: 8))
+    }
+
+    // One button for every state, so only its text changes.
     private var action: some View {
+        let title = store.registeredTagID == nil ? "Register your tag" : store.isZoned ? "Scan tag to leave" : "Enter the Zone"
+        return Button {
+            Task { await act() }
+        } label: {
+            Text(title)
+                .id(title)
+                .transition(.opacity)
+        }
+        .buttonStyle(ZoneButtonStyle())
+        .disabled(store.registeredTagID != nil && !store.isZoned && !store.hasBlockedItems)
+    }
+
+    private func act() async {
         if store.registeredTagID == nil {
-            Button("Register your tag") {
-                Task {
-                    if let id = await scanner.scan() { store.registerTag(id) }
-                }
-            }
-            .buttonStyle(ZoneButtonStyle())
+            if let id = await scanner.scan() { store.registerTag(id) }
         } else if store.isZoned {
-            Button("Scan tag to leave") {
-                Task {
-                    guard let id = await scanner.scan() else { return }
-                    guard store.isRegisteredTag(id) else {
-                        scanner.errorMessage = "That is not your Zone tag."
-                        return
-                    }
-                    withAnimation { store.leaveZone() }
-                }
+            guard let id = await scanner.scan() else { return }
+            guard store.isRegisteredTag(id) else {
+                scanner.errorMessage = "That is not your Zone tag."
+                return
             }
-            .buttonStyle(ZoneButtonStyle())
+            withAnimation(change) { store.leaveZone() }
         } else {
-            Button("Enter the Zone") {
-                withAnimation { store.enterZone() }
-            }
-            .buttonStyle(ZoneButtonStyle())
-            .disabled(!store.hasBlockedItems)
+            withAnimation(change) { store.enterZone() }
         }
     }
 }
