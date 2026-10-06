@@ -3,7 +3,7 @@ import SwiftUI
 
 struct AnalyticsView: View {
     @Environment(ZoneStore.self) private var store
-    @State private var page: Int? = 0
+    @State private var page = 0
 
     var body: some View {
         VStack(spacing: 0) {
@@ -11,30 +11,20 @@ struct AnalyticsView: View {
             // Update every minute, so the current session counts as it runs.
             TimelineView(.periodic(from: .now, by: 60)) { context in
                 let stats = ZoneStats(sessions: store.sessions(at: context.date), now: context.date)
-                ScrollView(.horizontal) {
-                    LazyHStack(spacing: 12) {
-                        MonthCard(stats: stats).card().id(0)
-                        WeekCard(stats: stats).card().id(1)
-                    }
-                    .scrollTargetLayout()
+                TabView(selection: $page) {
+                    MonthPage(stats: stats).page().tag(0)
+                    WeekPage(stats: stats).page().tag(1)
                 }
-                .contentMargins(.horizontal, 24, for: .scrollContent)
-                .scrollTargetBehavior(.viewAligned)
-                .scrollIndicators(.hidden)
-                .scrollPosition(id: $page)
+                .tabViewStyle(.page(indexDisplayMode: .never))
             }
-            // Fits the month grid with 6 rows of weeks.
-            .frame(height: 420)
-            .padding(.top, 16)
-            HStack(spacing: 7) {
+            HStack(spacing: 6) {
                 ForEach(0..<2, id: \.self) { index in
                     Circle()
                         .fill(page == index ? Color.zoneInk : Color(rgb: 0x3A3A42))
-                        .frame(width: 7, height: 7)
+                        .frame(width: 6, height: 6)
                 }
             }
-            .padding(.vertical, 14)
-            Spacer()
+            .padding(.vertical, 12)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.zoneBackground)
@@ -42,13 +32,22 @@ struct AnalyticsView: View {
 }
 
 private extension View {
-    // A card that leaves the next card in view at the edge.
-    func card() -> some View {
-        padding(.horizontal, 16)
-            .padding(.top, 18)
-            .frame(maxHeight: .infinity, alignment: .top)
-            .background(Color.zoneCard, in: .rect(cornerRadius: 26))
-            .containerRelativeFrame(.horizontal) { width, _ in width - 12 }
+    func page() -> some View {
+        padding(.horizontal, 24)
+            .padding(.top, 16)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+    }
+}
+
+private extension View {
+    // The bubble is a tooltip: it goes away by itself.
+    func hidesSelection(_ selected: Binding<Date?>) -> some View {
+        task(id: selected.wrappedValue) {
+            guard selected.wrappedValue != nil,
+                  (try? await Task.sleep(for: .seconds(2))) != nil
+            else { return }
+            withAnimation(.easeOut(duration: 0.15)) { selected.wrappedValue = nil }
+        }
     }
 }
 
@@ -102,7 +101,7 @@ private struct Bubble: View {
 }
 
 // Slide 1: a square for each day of this month, brighter for more time in the Zone.
-private struct MonthCard: View {
+private struct MonthPage: View {
     let stats: ZoneStats
     @State private var selected: Date?
 
@@ -118,6 +117,7 @@ private struct MonthCard: View {
             grid(days)
                 .padding(.top, 8)
         }
+        .hidesSelection($selected)
     }
 
     private var weekdayHeader: some View {
@@ -178,7 +178,7 @@ private struct MonthCard: View {
             .contentShape(.rect)
             .onTapGesture {
                 guard !future else { return }
-                selected = isSelected ? nil : item.day
+                withAnimation(.easeOut(duration: 0.1)) { selected = isSelected ? nil : item.day }
             }
             .accessibilityElement()
             .accessibilityLabel(item.day.formatted(date: .complete, time: .omitted))
@@ -198,7 +198,7 @@ private struct MonthCard: View {
 }
 
 // Slide 2: the last 7 days as bars, like Screen Time, with the daily average.
-private struct WeekCard: View {
+private struct WeekPage: View {
     let stats: ZoneStats
     @State private var selected: Date?
 
@@ -206,7 +206,8 @@ private struct WeekCard: View {
         let days = stats.lastDays(7)
         let total = days.reduce(0) { $0 + $1.time }
         let average = total / 7
-        let top = max(3, (days.map(\.time).max() ?? 0) / 3600).rounded(.up)
+        // Room above the tallest bar for the bubble.
+        let top = max(1, (days.map(\.time).max() ?? 0) / 3600) * 1.3
         VStack(spacing: 0) {
             Readout(value: zoneTimeText(average), detail: "Total \(zoneTimeText(total))")
             Chart {
@@ -225,27 +226,11 @@ private struct WeekCard: View {
                     }
                 }
                 RuleMark(y: .value("Average", average / 3600))
-                    .foregroundStyle(Color.zoneBone.opacity(0.8))
+                    .foregroundStyle(Color.zoneBone.opacity(0.5))
                     .lineStyle(StrokeStyle(lineWidth: 1.5, dash: [3, 3]))
-                    .annotation(position: .trailing, alignment: .center, spacing: 4) {
-                        Text("avg")
-                            .font(.system(size: 11))
-                            .foregroundStyle(Color.zoneBone)
-                    }
             }
             .chartYScale(domain: 0...top)
-            .chartYAxis {
-                AxisMarks(position: .trailing, values: .stride(by: 1)) { value in
-                    AxisGridLine(stroke: StrokeStyle(lineWidth: 1, dash: [3, 3]))
-                        .foregroundStyle(Color(rgb: 0x26262D))
-                    AxisValueLabel {
-                        if let hours = value.as(Double.self) {
-                            Text(hours == 0 ? "0" : "\(Int(hours))h")
-                        }
-                    }
-                    .foregroundStyle(Color.zoneMute)
-                }
-            }
+            .chartYAxis(.hidden)
             .chartXAxis {
                 AxisMarks(values: .stride(by: .day)) {
                     AxisValueLabel(format: .dateTime.weekday(.narrow), centered: true)
@@ -263,12 +248,14 @@ private struct WeekCard: View {
                             guard let date: Date = proxy.value(atX: x) else { return }
                             let day = Calendar.current.startOfDay(for: date)
                             guard days.contains(where: { $0.day == day }) else { return }
-                            selected = selected == day ? nil : day
+                            withAnimation(.easeOut(duration: 0.1)) { selected = selected == day ? nil : day }
                         }
                 }
             }
-            .frame(height: 250)
+            .frame(maxHeight: .infinity)
             .padding(.top, 24)
+            .padding(.bottom, 8)
         }
+        .hidesSelection($selected)
     }
 }
