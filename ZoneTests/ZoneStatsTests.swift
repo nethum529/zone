@@ -44,4 +44,12 @@ struct ZoneStatsTests {
         #expect(days.last?.time == 1800)
         #expect(days.dropLast().allSatisfy { $0.time == 0 })
     }
+
+    @Test func monthDaysCoversTheWholeMonth() {
+        let sessions = [ZoneSession(start: date(31, 22), end: date(31, 23))]
+        let days = ZoneStats(sessions: sessions, now: date(4, 12), calendar: calendar).monthDays()
+        #expect(days.count == 31)
+        #expect(days.first?.day == date(1, 0))
+        #expect(days.last?.time == 3600)
+    }
 }

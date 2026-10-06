@@ -6,11 +6,16 @@ struct ContentView: View {
     @Environment(ZoneStore.self) private var store
 
     var body: some View {
-        if store.authorization == .approved {
-            NavigationStack { MainView() }
-        } else {
-            OnboardingView()
+        Group {
+            if store.authorization == .approved {
+                MainView()
+            } else {
+                OnboardingView()
+            }
         }
+        .fontDesign(.rounded)
+        .foregroundStyle(Color.zoneInk)
+        .preferredColorScheme(.dark)
     }
 }
 
@@ -18,88 +23,46 @@ private struct OnboardingView: View {
     @Environment(ZoneStore.self) private var store
 
     var body: some View {
-        VStack(spacing: 20) {
+        VStack(alignment: .leading, spacing: 16) {
             Spacer()
-            Image(systemName: "lock.circle.fill")
-                .font(.system(size: 72))
-                .foregroundStyle(.tint)
             Text("Zone")
-                .font(.largeTitle.bold())
+                .font(.system(size: 34, weight: .bold))
             Text("Zone blocks the apps you choose until you tap your tag again. It needs Screen Time access to do this.")
-                .multilineTextAlignment(.center)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.zoneMute)
             Spacer()
             Button("Allow Screen Time access") {
                 Task { await store.requestAuthorization() }
             }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
+            .buttonStyle(ZoneButtonStyle())
         }
-        .padding(32)
+        .padding(24)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color.zoneBackground)
     }
+}
+
+private enum ZoneTab {
+    case home, analytics, settings
 }
 
 private struct MainView: View {
     @Environment(ZoneStore.self) private var store
     @Environment(\.scenePhase) private var scenePhase
-    @State private var tagReader = TagReader()
-    @State private var showingPicker = false
-    @State private var errorMessage: String?
+    @State private var tab = ZoneTab.home
 
     var body: some View {
-        @Bindable var store = store
-        VStack(spacing: 24) {
-            Spacer()
-            status
-            Spacer()
-            if store.registeredTagID == nil {
-                Button("Register your tag") { Task { await registerTag() } }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.large)
-                Text("Hold your phone near the tag you want to use.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            } else {
-                Button(store.isZoned ? "Leave the Zone" : "Enter the Zone") {
-                    if store.isZoned {
-                        Task { await leaveZone() }
-                    } else {
-                        withAnimation { store.enterZone() }
-                    }
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
-                .disabled(!store.isZoned && !store.hasBlockedItems)
+        TabView(selection: $tab) {
+            Tab("Home", image: tab == .home ? "house-fill" : "house", value: .home) {
+                HomeView()
             }
-            Button(pickerLabel) { showingPicker = true }
-                .disabled(store.isZoned || store.relockAt != nil)
-            if store.registeredTagID != nil {
-                // Only when unlocked, so a new tag cannot be used to leave the Zone.
-                Button("Change tag") { Task { await registerTag() } }
-                    .disabled(store.isZoned || store.relockAt != nil)
+            Tab("Analytics", image: tab == .analytics ? "chart-bar-fill" : "chart-bar", value: .analytics) {
+                AnalyticsView()
             }
-            VStack(spacing: 4) {
-                Toggle("Super Zone", isOn: $store.superZone)
-                HStack {
-                    Text("Locks again after you leave")
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    Picker("Locks again after you leave", selection: $store.relockMinutes) {
-                        ForEach(ZoneStore.relockChoices, id: \.self) { Text("\($0) min") }
-                    }
-                    .labelsHidden()
-                }
-                .font(.footnote)
+            Tab("Settings", image: tab == .settings ? "gear-six-fill" : "gear-six", value: .settings) {
+                SettingsView()
             }
-            .disabled(store.relockAt != nil)
         }
-        .padding(32)
-        .toolbar {
-            NavigationLink { StatsView() } label: {
-                Image(systemName: "chart.bar")
-            }
-            .accessibilityLabel("Stats")
-        }
+        .tint(Color.zoneInk)
         .onChange(of: scenePhase) {
             if scenePhase == .active { store.refresh() }
         }
@@ -110,68 +73,37 @@ private struct MainView: View {
             guard !Task.isCancelled else { return }
             withAnimation { store.refresh() }
         }
-        .familyActivityPicker(isPresented: $showingPicker, selection: $store.selection)
-        .alert("Zone", isPresented: .constant(errorMessage != nil)) {
-            Button("OK") { errorMessage = nil }
+    }
+}
+
+// Scans the tag and shows what went wrong, if anything.
+@MainActor
+@Observable
+final class TagScanner {
+    var errorMessage: String?
+    private let reader = TagReader()
+
+    // Returns nil when the scan failed or the user closed the scan sheet.
+    func scan() async -> String? {
+        do {
+            return try await reader.scan(prompt: "Hold your phone near your Zone tag.")
+        } catch {
+            // The user closed the scan sheet. This is not an error to show.
+            if let nfcError = error as? NFCReaderError, nfcError.code == .readerSessionInvalidationErrorUserCanceled {
+                return nil
+            }
+            errorMessage = error.localizedDescription
+            return nil
+        }
+    }
+}
+
+extension View {
+    func tagScanAlert(_ scanner: TagScanner) -> some View {
+        alert("Zone", isPresented: .constant(scanner.errorMessage != nil)) {
+            Button("OK") { scanner.errorMessage = nil }
         } message: {
-            Text(errorMessage ?? "")
+            Text(scanner.errorMessage ?? "")
         }
-    }
-
-    private var status: some View {
-        VStack(spacing: 12) {
-            Image(systemName: store.isZoned ? "lock.fill" : "lock.open")
-                .font(.system(size: 64))
-                .foregroundStyle(store.isZoned ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
-                .contentTransition(.symbolEffect(.replace))
-            Text(store.isZoned ? "In the Zone" : "Not in the Zone")
-                .font(.largeTitle.bold())
-            if let since = store.zonedSince {
-                Text(since, style: .timer)
-                    .font(.title2.monospacedDigit())
-                    .foregroundStyle(.secondary)
-            } else if let relockAt = store.relockAt {
-                Text("Locks again in \(Text(relockAt, style: .timer))")
-                    .font(.title2.monospacedDigit())
-                    .foregroundStyle(.secondary)
-            }
-        }
-    }
-
-    private var pickerLabel: String {
-        let count = store.selection.applicationTokens.count
-            + store.selection.categoryTokens.count
-            + store.selection.webDomainTokens.count
-        return count == 0 ? "Choose apps to block" : "Blocking \(count) item\(count == 1 ? "" : "s")"
-    }
-
-    private func registerTag() async {
-        do {
-            let id = try await tagReader.scan(prompt: "Hold your phone near your Zone tag.")
-            store.registerTag(id)
-        } catch {
-            show(error)
-        }
-    }
-
-    private func leaveZone() async {
-        do {
-            let id = try await tagReader.scan(prompt: "Hold your phone near your Zone tag.")
-            guard store.isRegisteredTag(id) else {
-                errorMessage = "That is not your Zone tag."
-                return
-            }
-            withAnimation { store.leaveZone() }
-        } catch {
-            show(error)
-        }
-    }
-
-    private func show(_ error: Error) {
-        // The user closed the scan sheet. This is not an error to show.
-        if let nfcError = error as? NFCReaderError, nfcError.code == .readerSessionInvalidationErrorUserCanceled {
-            return
-        }
-        errorMessage = error.localizedDescription
     }
 }

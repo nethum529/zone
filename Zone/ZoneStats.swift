@@ -52,6 +52,16 @@ struct ZoneStats {
         }
     }
 
+    // Every day in the month of now, first day first, with the time in the Zone on each day.
+    func monthDays() -> [(day: Date, time: TimeInterval)] {
+        guard let month = calendar.dateInterval(of: .month, for: now) else { return [] }
+        let count = calendar.range(of: .day, in: .month, for: now)?.count ?? 0
+        return (0..<count).map { offset in
+            let day = calendar.date(byAdding: .day, value: offset, to: month.start)!
+            return (day, time(on: day))
+        }
+    }
+
     func time(on day: Date) -> TimeInterval {
         guard let interval = calendar.dateInterval(of: .day, for: day) else { return 0 }
         return time(in: interval)
