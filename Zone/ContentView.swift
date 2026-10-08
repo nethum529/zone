@@ -43,8 +43,38 @@ private struct OnboardingView: View {
     }
 }
 
-private enum ZoneTab {
+private enum ZoneTab: CaseIterable {
     case home, analytics, settings
+
+    var title: String {
+        switch self {
+        case .home: "Home"
+        case .analytics: "Analytics"
+        case .settings: "Settings"
+        }
+    }
+}
+
+// Three words at the bottom, lined up with the page edges. The current tab is in ink.
+private struct ZoneTabBar: View {
+    @Binding var tab: ZoneTab
+
+    var body: some View {
+        HStack {
+            ForEach(ZoneTab.allCases, id: \.self) { item in
+                if item != .home { Spacer() }
+                Button(item.title) { tab = item }
+                    .foregroundStyle(item == tab ? Color.zoneInk : Color.zoneMute)
+                    .frame(height: 48)
+                    .contentShape(.rect)
+                    .accessibilityAddTraits(item == tab ? .isSelected : [])
+            }
+        }
+        .font(.system(size: 17, weight: .semibold))
+        .buttonStyle(.plain)
+        .padding(.horizontal, 24)
+        .background(Color.zoneBackground)
+    }
 }
 
 private struct MainView: View {
@@ -53,18 +83,12 @@ private struct MainView: View {
     @State private var tab = ZoneTab.home
 
     var body: some View {
+        // The system tab bar is hidden. ZoneTabBar replaces it, and TabView keeps each tab's state.
         TabView(selection: $tab) {
-            Tab("Home", image: tab == .home ? "house-fill" : "house", value: .home) {
-                HomeView()
-            }
-            Tab("Analytics", image: tab == .analytics ? "chart-bar-fill" : "chart-bar", value: .analytics) {
-                AnalyticsView()
-            }
-            Tab("Settings", image: tab == .settings ? "gear-six-fill" : "gear-six", value: .settings) {
-                SettingsView()
-            }
+            Tab(value: .home) { withBar(HomeView()) }
+            Tab(value: .analytics) { withBar(AnalyticsView()) }
+            Tab(value: .settings) { withBar(SettingsView()) }
         }
-        .tint(Color.zoneInk)
         .modifier(ScheduleRefresh())
         .onChange(of: scenePhase) {
             if scenePhase == .active { store.refresh() }
@@ -76,6 +100,15 @@ private struct MainView: View {
             guard !Task.isCancelled else { return }
             withAnimation { store.refresh() }
         }
+    }
+
+    // An inset on the TabView does not reach the tabs, so each tab gets its own bar.
+    private func withBar(_ content: some View) -> some View {
+        content
+            .toolbarVisibility(.hidden, for: .tabBar)
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                ZoneTabBar(tab: $tab)
+            }
     }
 }
 
