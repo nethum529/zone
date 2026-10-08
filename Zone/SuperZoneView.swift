@@ -16,7 +16,7 @@ struct SuperZoneView: View {
                             .font(.system(size: 20, weight: .medium))
                             .foregroundStyle(Color.zoneInk)
                     }
-                    .toggleStyle(ZoneToggleStyle())
+                    .toggleStyle(ZoneToggleStyle(size: 20))
                     .frame(height: 64)
                     Menu {
                         Picker("Relock after", selection: $store.relockMinutes) {

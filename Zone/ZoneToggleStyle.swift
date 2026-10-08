@@ -1,34 +1,44 @@
 import SwiftUI
 
-// A bone switch: a dark knob on bone when on, a grey knob on the track when off.
+// A switch that is a word: On in bone, Off in grey, where a row shows its value.
+// On a change the words roll: On lives below, Off lives above.
 struct ZoneToggleStyle: ToggleStyle {
-    var showsLabel = true
+    // The word is the same size as the label beside it.
+    var size: CGFloat = 17
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     func makeBody(configuration: Configuration) -> some View {
+        let isOn = configuration.isOn
+        // The words move 70 percent of their height.
+        let travel = reduceMotion ? 0 : size * 0.85
         Button { configuration.isOn.toggle() } label: {
             HStack {
-                if showsLabel {
-                    configuration.label
+                configuration.label
+                    .foregroundStyle(Color.zoneMute)
+                Spacer()
+                ZStack(alignment: .trailing) {
+                    Text("Off")
                         .foregroundStyle(Color.zoneMute)
-                    Spacer()
+                        .offset(y: isOn ? -travel : 0)
+                        .opacity(isOn ? 0 : 1)
+                    Text("On")
+                        .foregroundStyle(Color.zoneBone)
+                        .offset(y: isOn ? 0 : travel)
+                        .opacity(isOn ? 1 : 0)
                 }
-                Capsule()
-                    .fill(configuration.isOn ? Color.zoneBone : Color.zoneTrack)
-                    .frame(width: 50, height: 30)
-                    .overlay(alignment: configuration.isOn ? .trailing : .leading) {
-                        Circle()
-                            .fill(configuration.isOn ? Color.zoneBackground : Color.zoneMute)
-                            .padding(4)
-                    }
-                    .animation(reduceMotion ? nil : .smooth(duration: 0.2), value: configuration.isOn)
+                .font(.system(size: size, weight: .semibold))
+                .frame(width: 48, height: 30, alignment: .trailing)
+                .clipped()
+                .animation(.timingCurve(0.23, 1, 0.32, 1, duration: 0.22), value: isOn)
+                .accessibilityHidden(true)
             }
             .font(.system(size: 17))
             .frame(height: 52)
             .contentShape(.rect)
         }
         .buttonStyle(ZoneRowStyle())
+        .sensoryFeedback(.selection, trigger: isOn)
         .accessibilityAddTraits(.isToggle)
-        .accessibilityValue(configuration.isOn ? "On" : "Off")
+        .accessibilityValue(isOn ? "On" : "Off")
     }
 }
