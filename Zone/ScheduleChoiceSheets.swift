@@ -106,57 +106,33 @@ struct ScheduleTimeSheet: View {
     let title: String
     @Binding var minute: Int
     @Environment(\.dismiss) private var dismiss
-    @State private var input: ScheduleTimeInput
-    @FocusState private var field: Field?
-
-    private enum Field { case hour, minute }
+    @State private var time: Date
 
     init(title: String, minute: Binding<Int>) {
         self.title = title
         _minute = minute
-        _input = State(initialValue: ScheduleTimeInput(value: minute.wrappedValue))
+        _time = State(initialValue: ZoneSchedule.time(minute.wrappedValue))
     }
 
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
                 ZoneTitle(title)
-                ScrollView {
-                    VStack(spacing: 0) {
-                        numberRow("Hour", text: $input.hour, field: .hour)
-                        numberRow("Minute", text: $input.minute, field: .minute)
-                        if !input.uses24HourClock {
-                            HStack(spacing: 16) {
-                                Text("Period").foregroundStyle(Color.zoneMute)
-                                Spacer()
-                                periodButton("AM", isPM: false)
-                                periodButton("PM", isPM: true)
-                            }
-                            .frame(minHeight: 52)
-                            .padding(.top, 24)
-                        }
-                        if input.value == nil {
-                            Text(input.validationMessage)
-                                .font(.footnote)
-                                .foregroundStyle(Color.zoneMute)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.top, 16)
-                        }
-                    }
-                    .font(.body)
+                // The iOS wheel: hour, minute, and AM or PM when the clock uses them.
+                DatePicker(title, selection: $time, displayedComponents: .hourAndMinute)
+                    .datePickerStyle(.wheel)
+                    .labelsHidden()
+                    .frame(maxWidth: .infinity)
                     .padding(.horizontal, 24)
                     .padding(.top, 24)
-                }
-                .scrollDismissesKeyboard(.interactively)
+                Spacer()
             }
             .safeAreaInset(edge: .bottom) {
                 Button("Set time") {
-                    guard let value = input.value else { return }
-                    minute = value
+                    minute = ZoneSchedule.minute(time)
                     dismiss()
                 }
                 .buttonStyle(ZoneButtonStyle())
-                .disabled(input.value == nil)
                 .padding(24)
                 .background(Color.zoneBackground)
             }
@@ -167,37 +143,5 @@ struct ScheduleTimeSheet: View {
                 }
             }
         }
-    }
-
-    private func numberRow(_ title: String, text: Binding<String>, field: Field) -> some View {
-        HStack(spacing: 16) {
-            Text(title).foregroundStyle(Color.zoneMute)
-            TextField(title, text: text)
-                .textFieldStyle(.plain)
-                .fontWeight(.semibold)
-                .monospacedDigit()
-                .multilineTextAlignment(.trailing)
-                .keyboardType(.numberPad)
-                .focused($field, equals: field)
-                .accessibilityLabel(title)
-                .accessibilityIdentifier("schedule-time-\(title.lowercased())")
-        }
-        .frame(minHeight: 52)
-        .contentShape(.rect)
-        .onTapGesture { self.field = field }
-    }
-
-    private func periodButton(_ title: String, isPM: Bool) -> some View {
-        Button {
-            input.isPM = isPM
-        } label: {
-            Text(title)
-                .fontWeight(.semibold)
-                .foregroundStyle(input.isPM == isPM ? Color.zoneBackground : Color.zoneInk)
-                .frame(minWidth: 56, minHeight: 44)
-                .background(input.isPM == isPM ? Color.zoneBone : Color.zoneTrack, in: .zoneButton)
-        }
-        .buttonStyle(ZoneRowStyle())
-        .accessibilityAddTraits(input.isPM == isPM ? .isSelected : [])
     }
 }
