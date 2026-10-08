@@ -1,12 +1,5 @@
 import Foundation
 
-struct ZoneSession: Codable, Hashable {
-    let start: Date
-    let end: Date
-
-    var duration: TimeInterval { end.timeIntervalSince(start) }
-}
-
 // Totals and streaks from the Zone sessions.
 // A session that crosses midnight counts on each day for the part on that day.
 struct ZoneStats {

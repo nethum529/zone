@@ -52,7 +52,7 @@ struct ZoneButtonStyle: ButtonStyle {
             .frame(height: 56)
             .background(Color.zoneBone, in: .capsule)
             .scaleEffect(isEnabled && configuration.isPressed && !reduceMotion ? 0.97 : 1)
-            .opacity(isEnabled ? 1 : 0.4)
+            .opacity(isEnabled ? (configuration.isPressed && reduceMotion ? 0.8 : 1) : 0.4)
             .animation(.smooth(duration: 0.2), value: configuration.isPressed)
     }
 }

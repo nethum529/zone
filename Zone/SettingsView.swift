@@ -4,6 +4,7 @@ struct SettingsView: View {
     @Environment(ZoneStore.self) private var store
     @State private var showingTags = false
     @State private var showingProfiles = false
+    @State private var showingSchedules = false
 
     var body: some View {
         @Bindable var store = store
@@ -17,6 +18,10 @@ struct SettingsView: View {
                     Button { showingTags = true } label: {
                         row("Zone tags", value: tagSummary) { ZoneCaret() }
                     }
+                    Button { showingSchedules = true } label: {
+                        row("Schedules", value: scheduleText) { ZoneCaret() }
+                    }
+                    .padding(.top, 24)
                     VStack(spacing: 0) {
                         Toggle("Super Zone", isOn: $store.superZone)
                             .toggleStyle(ZoneToggleStyle())
@@ -48,12 +53,18 @@ struct SettingsView: View {
         .background(Color.zoneBackground)
         .sheet(isPresented: $showingProfiles) { ProfilesView() }
         .sheet(isPresented: $showingTags) { ZoneTagsView(tags: store.tags) }
+        .sheet(isPresented: $showingSchedules) { SchedulesView() }
     }
 
     private var tagSummary: String {
         if store.tags.backupID != nil { "2 tags" }
         else if store.tags.mainID != nil { "1 tag" }
         else { "Register" }
+    }
+
+    private var scheduleText: String {
+        let count = store.scheduleStore.schedules.count
+        return count == 0 ? "None" : "\(count) schedule\(count == 1 ? "" : "s")"
     }
 
     // The same label and value row as on Home.
@@ -84,33 +95,5 @@ struct ZoneRowStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .opacity(isEnabled ? (configuration.isPressed ? 0.6 : 1) : 0.4)
-    }
-}
-
-// A bone switch: a dark knob on bone when on, a grey knob on the track when off.
-private struct ZoneToggleStyle: ToggleStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        Button { configuration.isOn.toggle() } label: {
-            HStack {
-                configuration.label
-                    .foregroundStyle(Color.zoneMute)
-                Spacer()
-                Capsule()
-                    .fill(configuration.isOn ? Color.zoneBone : Color.zoneTrack)
-                    .frame(width: 50, height: 30)
-                    .overlay(alignment: configuration.isOn ? .trailing : .leading) {
-                        Circle()
-                            .fill(configuration.isOn ? Color.zoneBackground : Color.zoneMute)
-                            .padding(4)
-                    }
-                    .animation(.smooth(duration: 0.2), value: configuration.isOn)
-            }
-            .font(.system(size: 17))
-            .frame(height: 52)
-            .contentShape(.rect)
-        }
-        .buttonStyle(ZoneRowStyle())
-        .accessibilityAddTraits(.isToggle)
-        .accessibilityValue(configuration.isOn ? "On" : "Off")
     }
 }

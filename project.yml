@@ -118,6 +118,7 @@ targets:
       - WidgetShared
       - Zone/Theme.swift
       - Zone/ZoneStats.swift
+      - Shared/ZoneSession.swift
     entitlements:
       path: ZoneWidget/ZoneWidget.entitlements
       properties:
