@@ -9,38 +9,40 @@ struct ProfilesView: View {
     @State private var path: [ZoneProfile.ID] = []
     @State private var adding = false
     @State private var newName = ""
-    @State private var deleting: ZoneProfile?
+    // The row that shows Delete now.
+    @State private var swiped: ZoneProfile.ID?
+    // Deleted by swipe but still kept until the undo line hides.
+    @State private var pending: ZoneProfile?
 
     var body: some View {
         NavigationStack(path: $path) {
             VStack(spacing: 0) {
                 ZoneTitle("Profiles")
-                // A plain List only for swipe to delete. It draws no cards or lines.
-                List {
-                    ForEach(store.profiles.all) { profile in
-                        profileRow(profile)
-                            .listRowInsets(EdgeInsets(top: 0, leading: 24, bottom: 0, trailing: 24))
-                            .listRowBackground(Color.zoneBackground)
-                            .listRowSeparator(.hidden)
-                            .swipeActions {
-                                if store.canDeleteProfile(profile.id) {
-                                    Button("Delete") { deleting = profile }
-                                        .tint(.red)
+                ScrollView {
+                    VStack(spacing: 0) {
+                        ForEach(visible) { profile in
+                            profileRow(profile)
+                                .padding(.horizontal, 24)
+                                .swipeToDelete(profile.id, open: $swiped, enabled: canSwipeDelete(profile.id)) {
+                                    swipeDelete(profile)
                                 }
-                            }
+                        }
                     }
                 }
-                .listStyle(.plain)
-                .scrollContentBackground(.hidden)
                 .contentMargins(.top, 24, for: .scrollContent)
+                .onScrollPhaseChange { _, phase in
+                    if phase != .idle { swiped = nil }
+                }
             }
             .safeAreaInset(edge: .bottom) {
                 Button("Add profile") {
+                    if let pending { commit(pending) }
                     newName = ""
                     adding = true
                 }
                 .buttonStyle(ZoneButtonStyle())
                 .padding(24)
+                .undoLine($pending, text: { "\($0.name) deleted" }, commit: commit)
             }
             .profilePage()
             .toolbar {
@@ -55,17 +57,6 @@ struct ProfilesView: View {
                 }
                 .disabled(isBlank(newName))
             }
-            .confirmationDialog(
-                "Delete \(deleting?.name ?? "")?",
-                isPresented: Binding { deleting != nil } set: { if !$0 { deleting = nil } },
-                titleVisibility: .visible,
-                presenting: deleting
-            ) { profile in
-                Button("Delete profile", role: .destructive) {
-                    withAnimation(.smooth(duration: 0.3)) { store.profiles.delete(profile.id) }
-                }
-                Button("Cancel", role: .cancel) {}
-            }
         }
         .tint(Color.zoneBone)
         .foregroundStyle(Color.zoneInk)
@@ -77,7 +68,7 @@ struct ProfilesView: View {
     private func profileRow(_ profile: ZoneProfile) -> some View {
         let current = store.profiles.currentID == profile.id
         // With one profile there is nothing to choose, so no check.
-        let checked = current && store.profiles.all.count > 1
+        let checked = current && visible.count > 1
         return HStack(spacing: 0) {
             Button {
                 withAnimation(.smooth(duration: 0.3)) { store.profiles.choose(profile.id) }
@@ -85,11 +76,13 @@ struct ProfilesView: View {
                 HStack(spacing: 6) {
                     Text(profile.name)
                         .lineLimit(1)
+                        .swipeLabel()
                     Spacer()
                     Image("check")
                         .resizable()
                         .frame(width: 14, height: 14)
                         .opacity(checked ? 1 : 0)
+                        .swipeValue()
                 }
                 .frame(height: 52)
                 .contentShape(.rect)
@@ -100,6 +93,7 @@ struct ProfilesView: View {
             Button { path.append(profile.id) } label: {
                 ZoneCaret()
                     .padding(.trailing, -4)
+                    .swipeValue()
                     .frame(width: 44, height: 52, alignment: .trailing)
                     .contentShape(.rect)
             }
@@ -107,6 +101,30 @@ struct ProfilesView: View {
         }
         .font(.system(size: 17))
         .buttonStyle(ZoneRowStyle())
+    }
+
+    // The profiles on screen. One that waits for its undo line is already gone.
+    private var visible: [ZoneProfile] {
+        store.profiles.all.filter { $0.id != pending?.id }
+    }
+
+    // Keep one profile on screen, and never delete the one that is locked now.
+    private func canSwipeDelete(_ id: ZoneProfile.ID) -> Bool {
+        visible.count > 1 && store.canDeleteProfile(id)
+    }
+
+    private func swipeDelete(_ profile: ZoneProfile) {
+        if let pending { commit(pending) }
+        withAnimation(.smooth(duration: 0.34)) {
+            swiped = nil
+            pending = profile
+        }
+    }
+
+    // The undo line hid, so the delete is final.
+    private func commit(_ profile: ZoneProfile) {
+        if store.canDeleteProfile(profile.id) { store.profiles.delete(profile.id) }
+        pending = nil
     }
 }
 
