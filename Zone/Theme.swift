@@ -42,6 +42,7 @@ struct ZoneTitle: View {
 // The one main button style: a bone capsule with dark text.
 struct ZoneButtonStyle: ButtonStyle {
     @Environment(\.isEnabled) private var isEnabled
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
@@ -50,7 +51,7 @@ struct ZoneButtonStyle: ButtonStyle {
             .frame(maxWidth: .infinity)
             .frame(height: 56)
             .background(Color.zoneBone, in: .capsule)
-            .scaleEffect(configuration.isPressed ? 0.97 : 1)
+            .scaleEffect(isEnabled && configuration.isPressed && !reduceMotion ? 0.97 : 1)
             .opacity(isEnabled ? 1 : 0.4)
             .animation(.smooth(duration: 0.2), value: configuration.isPressed)
     }

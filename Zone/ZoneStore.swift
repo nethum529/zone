@@ -43,10 +43,11 @@ final class ZoneStore {
     }
 
     private typealias Keys = ZoneLock.Keys
-    private let defaults = ZoneLock.defaults
+    private let defaults: UserDefaults
     private let activityCenter = DeviceActivityCenter()
 
-    init() {
+    init(defaults: UserDefaults = ZoneLock.defaults) {
+        self.defaults = defaults
         authorization = AuthorizationCenter.shared.authorizationStatus
         superZone = defaults.bool(forKey: Keys.superZone)
         relockMinutes = defaults.object(forKey: Keys.relockMinutes) as? Int ?? Self.relockChoices[0]
@@ -105,17 +106,34 @@ final class ZoneStore {
         return sessions + [ZoneSession(start: zonedSince, end: now)]
     }
 
-    func leaveZone() {
+    func leaveZone(allowRelock: Bool = true) {
+        guard isZoned else { return }
+        defaults.removeObject(forKey: Keys.relockAt)
+        activityCenter.stopMonitoring([ZoneLock.relockActivity])
         if let zonedSince {
             sessions.append(ZoneSession(start: zonedSince, end: .now))
             defaults.set(try? JSONEncoder().encode(sessions), forKey: Keys.sessions)
         }
         ZoneLock.shields.clearAllSettings()
         defaults.removeObject(forKey: Keys.zonedSince)
-        if superZone {
+        if superZone && allowRelock {
             scheduleRelock()
         }
         refresh()
+    }
+
+    func emergencyUnlock(
+        attempt: inout EmergencyUnlockAttempt,
+        uptime: TimeInterval,
+        now: Date = .now
+    ) -> Bool {
+        guard isZoned else { return false }
+        let allowance = EmergencyUnlockAllowance(defaults: defaults)
+        guard allowance.remaining(at: now) > 0,
+              attempt.complete(at: uptime),
+              allowance.consume(at: now) else { return false }
+        leaveZone(allowRelock: false)
+        return true
     }
 
     private func scheduleRelock() {
