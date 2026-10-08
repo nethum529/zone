@@ -16,6 +16,7 @@ struct ContentView: View {
         .fontDesign(.rounded)
         .foregroundStyle(Color.zoneInk)
         .preferredColorScheme(.dark)
+        .task { await store.watchAuthorization() }
     }
 }
 

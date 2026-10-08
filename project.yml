@@ -36,7 +36,7 @@ targets:
         INFOPLIST_KEY_UIRequiresFullScreen: YES
         INFOPLIST_KEY_ITSAppUsesNonExemptEncryption: NO
         MARKETING_VERSION: "0.1"
-        CURRENT_PROJECT_VERSION: "1"
+        CURRENT_PROJECT_VERSION: "2"
   ZoneMonitor:
     type: app-extension
     platform: iOS
@@ -59,7 +59,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.nethum.zone.monitor
         MARKETING_VERSION: "0.1"
-        CURRENT_PROJECT_VERSION: "1"
+        CURRENT_PROJECT_VERSION: "2"
   ZoneTests:
     type: bundle.unit-test
     platform: iOS

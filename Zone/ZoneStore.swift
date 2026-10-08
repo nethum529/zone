@@ -59,6 +59,14 @@ final class ZoneStore {
         }
     }
 
+    // iOS loads the Screen Time status a moment after launch.
+    // Before that it reports notDetermined, so follow its changes.
+    func watchAuthorization() async {
+        for await status in AuthorizationCenter.shared.$authorizationStatus.values {
+            authorization = status
+        }
+    }
+
     func requestAuthorization() async {
         do {
             try await AuthorizationCenter.shared.requestAuthorization(for: .individual)
