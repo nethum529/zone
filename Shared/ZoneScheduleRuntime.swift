@@ -57,8 +57,16 @@ enum ZoneScheduleRuntime {
         var state = state(in: defaults)
         var since = defaults.object(forKey: ZoneLock.Keys.zonedSince) as? Date
         if let ended = state.finish(at: now, zonedSince: since) {
-            unlock(ended.interval.end)
-            since = nil
+            if let previous = ended.previousProfileID {
+                // The schedule took over a Zone the user entered. Give the profile back and stay in the Zone.
+                var profiles = ZoneProfiles.load(from: defaults)
+                profiles.choose(previous)
+                profiles.save(to: defaults)
+                lock(ended.zonedSince)
+            } else {
+                unlock(ended.interval.end)
+                since = nil
+            }
         }
         let sessions = defaults.data(forKey: ZoneLock.Keys.sessions)
             .flatMap { try? JSONDecoder().decode([ZoneSession].self, from: $0) } ?? []
@@ -77,6 +85,7 @@ enum ZoneScheduleRuntime {
             if let started = state.begin(schedule, at: now, zonedSince: since,
                                          canEnter: profile.map(canEnter) ?? false, wasZonedAtStart: occupied),
                let profile {
+                if since != nil { state.run?.previousProfileID = profiles.currentID }
                 profiles.choose(profile.id)
                 profiles.save(to: defaults)
                 lock(started.zonedSince)

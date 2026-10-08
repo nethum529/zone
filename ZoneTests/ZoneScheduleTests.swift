@@ -67,13 +67,15 @@ struct ZoneScheduleTests {
         #expect(state.finish(at: date(5, 18), zonedSince: run.zonedSince) == nil)
     }
 
-    @Test func manualZoneAtStartIsNeverOwnedOrEnded() {
+    @Test func manualZoneAtStartIsTakenOverUntilTheEnd() throws {
         var state = ZoneScheduleState()
         let schedule = schedule()
-        #expect(state.begin(schedule, at: date(5, 9), zonedSince: date(5, 8),
-                            canEnter: true, calendar: calendar) == nil)
-        #expect(state.run == nil)
-        #expect(state.finish(at: date(5, 17), zonedSince: date(5, 8)) == nil)
+        let started = state.begin(schedule, at: date(5, 9), zonedSince: date(5, 8),
+                                  canEnter: true, calendar: calendar)
+        let run = try #require(started)
+        #expect(run.zonedSince == date(5, 8))
+        #expect(state.finish(at: date(5, 16), zonedSince: date(5, 8)) == nil)
+        #expect(state.finish(at: date(5, 17), zonedSince: date(5, 8)) == run)
         #expect(state.begin(schedule, at: date(5, 10), zonedSince: nil,
                             canEnter: true, calendar: calendar) == nil)
     }
@@ -310,7 +312,7 @@ struct ZoneScheduleStoreTests {
     }
 
     @Test(arguments: [false, true])
-    func runtimeUsesTheScheduledProfileOnlyWhenItStartsAZone(alreadyZoned: Bool) throws {
+    func runtimeUsesTheScheduledProfileAlsoInAZoneTheUserEntered(alreadyZoned: Bool) throws {
         let name = "schedule-test-\(UUID())"
         let defaults = try #require(UserDefaults(suiteName: name))
         defer { defaults.removePersistentDomain(forName: name) }
@@ -324,10 +326,18 @@ struct ZoneScheduleStoreTests {
         defaults.set(try JSONEncoder().encode([schedule]), forKey: ZoneScheduleRuntime.schedulesKey)
         if alreadyZoned { defaults.set(start.addingTimeInterval(-3600), forKey: ZoneLock.Keys.zonedSince) }
         var lockedProfile: UUID?
-        ZoneScheduleRuntime.reconcile(at: start, defaults: defaults, canEnter: { $0.id == work }, lock: { _ in
+        ZoneScheduleRuntime.reconcile(at: start, defaults: defaults, canEnter: { $0.id == work }, lock: {
+            defaults.set($0, forKey: ZoneLock.Keys.zonedSince)
             lockedProfile = ZoneProfiles.load(from: defaults).currentID
         }, unlock: { _ in })
-        #expect(lockedProfile == (alreadyZoned ? nil : work))
+        #expect(lockedProfile == work)
+        #expect(ZoneProfiles.load(from: defaults).currentID == work)
+        // At the end, a Zone the user entered gets its profile back and stays on.
+        var unlocked = false
+        ZoneScheduleRuntime.reconcile(at: start.addingTimeInterval(8 * 3600), defaults: defaults, canEnter: { $0.id == work }, lock: { _ in
+            lockedProfile = ZoneProfiles.load(from: defaults).currentID
+        }, unlock: { _ in unlocked = true })
+        #expect(unlocked == !alreadyZoned)
         #expect(ZoneProfiles.load(from: defaults).currentID == (alreadyZoned ? focus : work))
     }
 
