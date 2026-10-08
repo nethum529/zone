@@ -2,7 +2,7 @@ import FamilyControls
 import SwiftUI
 
 // The list of profiles. Opens from Settings as a sheet.
-// Tap a name to use that profile. Tap the caret to edit it.
+// Tap a row to open that profile. The check shows the profile in use.
 struct ProfilesView: View {
     @Environment(ZoneStore.self) private var store
     @Environment(\.dismiss) private var dismiss
@@ -69,36 +69,26 @@ struct ProfilesView: View {
         let current = store.profiles.currentID == profile.id
         // With one profile there is nothing to choose, so no check.
         let checked = current && visible.count > 1
-        return HStack(spacing: 0) {
-            Button {
-                withAnimation(.smooth(duration: 0.3)) { store.profiles.choose(profile.id) }
-            } label: {
-                HStack(spacing: 6) {
-                    Text(profile.name)
-                        .lineLimit(1)
-                        .swipeLabel()
-                    Spacer()
-                    Image("check")
-                        .resizable()
-                        .frame(width: 14, height: 14)
-                        .opacity(checked ? 1 : 0)
-                        .swipeValue()
-                }
-                .frame(height: 52)
-                .contentShape(.rect)
-            }
-            // While locked, the profile in use cannot change.
-            .disabled(store.isLocked && !current)
-            .accessibilityAddTraits(current ? .isSelected : [])
-            Button { path.append(profile.id) } label: {
+        return Button { path.append(profile.id) } label: {
+            HStack(spacing: 6) {
+                Text(profile.name)
+                    .lineLimit(1)
+                    .swipeLabel()
+                Spacer()
+                Image("check")
+                    .resizable()
+                    .frame(width: 14, height: 14)
+                    .opacity(checked ? 1 : 0)
+                    .swipeValue()
                 ZoneCaret()
                     .padding(.trailing, -4)
                     .swipeValue()
-                    .frame(width: 44, height: 52, alignment: .trailing)
-                    .contentShape(.rect)
             }
-            .accessibilityLabel("Edit \(profile.name)")
+            .frame(height: 52)
+            .contentShape(.rect)
         }
+        .accessibilityLabel(profile.name)
+        .accessibilityAddTraits(current ? .isSelected : [])
         .font(.system(size: 17))
         .buttonStyle(ZoneRowStyle())
     }
@@ -144,6 +134,7 @@ private struct ProfileView: View {
         let profile = store.profiles.profile(id) ?? last
         // The profile that is locked now cannot lose apps or be deleted.
         let inUse = store.isLocked && store.profiles.currentID == id
+        let current = store.profiles.currentID == id
         VStack(spacing: 0) {
             ZoneTitle(profile?.name ?? "")
             ScrollView {
@@ -153,6 +144,16 @@ private struct ProfileView: View {
                     }
                     .disabled(inUse)
                     VStack(spacing: 0) {
+                        if !current {
+                            // While locked, the profile in use cannot change.
+                            Button {
+                                withAnimation(.smooth(duration: 0.3)) { store.profiles.choose(id) }
+                                dismiss()
+                            } label: {
+                                actionRow("Use this profile")
+                            }
+                            .disabled(store.isLocked)
+                        }
                         Button {
                             newName = profile?.name ?? ""
                             renaming = true
