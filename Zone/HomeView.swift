@@ -3,6 +3,8 @@ import SwiftUI
 struct HomeView: View {
     @Environment(ZoneStore.self) private var store
     @State private var scanner = TagScanner()
+    // After the first tag scan, ask for its name.
+    @State private var namingTag = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     // Entering and leaving the Zone.
@@ -24,6 +26,16 @@ struct HomeView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.zoneBackground)
         .tagScanAlert(scanner)
+        .sheet(isPresented: $namingTag) {
+            NavigationStack {
+                TagNameForm(tags: store.tags, backup: false) { namingTag = false }
+                    .toolbarBackground(Color.zoneBackground, for: .navigationBar)
+                    .navigationBarTitleDisplayMode(.inline)
+            }
+            .fontDesign(.rounded)
+            .tint(Color.zoneBone)
+            .preferredColorScheme(.dark)
+        }
     }
 
     // In the Zone: this session, with a full bar.
@@ -130,8 +142,10 @@ struct HomeView: View {
     private func act() async {
         if store.registeredTagID == nil {
             if let id = await scanner.scan() {
-                do { try store.registerTag(id) }
-                catch { scanner.errorMessage = error.localizedDescription }
+                do {
+                    try store.registerTag(id)
+                    namingTag = true
+                } catch { scanner.errorMessage = error.localizedDescription }
             }
         } else if store.isZoned {
             guard let id = await scanner.scan() else { return }
