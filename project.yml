@@ -12,11 +12,12 @@ targets:
   Zone:
     type: application
     platform: iOS
-    sources: [Zone, Shared, ZoneShield/ShieldLook.swift, ZoneShield/Shield.xcassets]
+    sources: [Zone, Shared, WidgetShared, ZoneShield/ShieldLook.swift, ZoneShield/Shield.xcassets]
     dependencies:
       - target: ZoneMonitor
       - target: ZoneShield
       - target: ZoneShieldAction
+      - target: ZoneWidget
     scheme:
       testTargets: [ZoneTests]
     entitlements:
@@ -32,6 +33,7 @@ targets:
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         INFOPLIST_KEY_CFBundleDisplayName: Zone
         INFOPLIST_KEY_NFCReaderUsageDescription: Zone reads your tag to start and end a session.
+        INFOPLIST_KEY_NSSupportsLiveActivities: YES
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
         INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
@@ -106,6 +108,31 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.nethum.zone.shieldaction
+        MARKETING_VERSION: "0.1"
+        CURRENT_PROJECT_VERSION: "2"
+  ZoneWidget:
+    type: app-extension
+    platform: iOS
+    sources:
+      - ZoneWidget
+      - WidgetShared
+      - Zone/Theme.swift
+      - Zone/ZoneStats.swift
+    entitlements:
+      path: ZoneWidget/ZoneWidget.entitlements
+      properties:
+        com.apple.security.application-groups: [group.com.nethum.zone]
+    info:
+      path: ZoneWidget/Info.plist
+      properties:
+        CFBundleDisplayName: Zone
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.nethum.zone.widget
         MARKETING_VERSION: "0.1"
         CURRENT_PROJECT_VERSION: "2"
   ZoneTests:
