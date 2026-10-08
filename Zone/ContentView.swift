@@ -7,7 +7,8 @@ struct ContentView: View {
 
     var body: some View {
         Group {
-            if store.authorization == .approved {
+            // The first run ends with the tag scan.
+            if store.authorization == .approved && store.registeredTagID != nil {
                 MainView()
             } else {
                 OnboardingView()
@@ -18,28 +19,6 @@ struct ContentView: View {
         .preferredColorScheme(.dark)
         .task { await store.watchAuthorization() }
         .syncsLockScreen(zonedSince: store.zonedSince)
-    }
-}
-
-private struct OnboardingView: View {
-    @Environment(ZoneStore.self) private var store
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Spacer()
-            Text("Zone")
-                .font(.system(size: 34, weight: .bold))
-            Text("Zone blocks the apps you choose until you tap your tag again. It needs Screen Time access to do this.")
-                .foregroundStyle(Color.zoneMute)
-            Spacer()
-            Button("Allow Screen Time access") {
-                Task { await store.requestAuthorization() }
-            }
-            .buttonStyle(ZoneButtonStyle())
-        }
-        .padding(24)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color.zoneBackground)
     }
 }
 
