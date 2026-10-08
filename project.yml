@@ -12,9 +12,11 @@ targets:
   Zone:
     type: application
     platform: iOS
-    sources: [Zone, Shared]
+    sources: [Zone, Shared, ZoneShield/ShieldLook.swift, ZoneShield/Shield.xcassets]
     dependencies:
       - target: ZoneMonitor
+      - target: ZoneShield
+      - target: ZoneShieldAction
     scheme:
       testTargets: [ZoneTests]
     entitlements:
@@ -58,6 +60,52 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.nethum.zone.monitor
+        MARKETING_VERSION: "0.1"
+        CURRENT_PROJECT_VERSION: "2"
+  ZoneShield:
+    type: app-extension
+    platform: iOS
+    sources: [ZoneShield, Shared]
+    entitlements:
+      path: ZoneShield/ZoneShield.entitlements
+      properties:
+        com.apple.developer.family-controls: true
+        com.apple.security.application-groups: [group.com.nethum.zone]
+    info:
+      path: ZoneShield/Info.plist
+      properties:
+        CFBundleDisplayName: Zone Shield
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.ManagedSettingsUI.shield-configuration-service
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).ShieldConfigurationExtension
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.nethum.zone.shield
+        MARKETING_VERSION: "0.1"
+        CURRENT_PROJECT_VERSION: "2"
+  ZoneShieldAction:
+    type: app-extension
+    platform: iOS
+    sources: [ZoneShieldAction]
+    entitlements:
+      path: ZoneShieldAction/ZoneShieldAction.entitlements
+      properties:
+        com.apple.developer.family-controls: true
+        com.apple.security.application-groups: [group.com.nethum.zone]
+    info:
+      path: ZoneShieldAction/Info.plist
+      properties:
+        CFBundleDisplayName: Zone Shield Action
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.ManagedSettings.shield-action-service
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).ShieldActionExtension
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.nethum.zone.shieldaction
         MARKETING_VERSION: "0.1"
         CURRENT_PROJECT_VERSION: "2"
   ZoneTests:
