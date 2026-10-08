@@ -3,10 +3,16 @@ import SwiftUI
 struct ScheduleEditorView: View {
     @Environment(ZoneStore.self) private var zone
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.dynamicTypeSize) private var typeSize
     @State var schedule: ZoneSchedule
     let isNew: Bool
     @State private var errorMessage: String?
+    @State private var field: Field?
+    @FocusState private var editingName: Bool
+
+    private enum Field: String, Identifiable {
+        case profile, repeatDays, start, end
+        var id: Self { self }
+    }
 
     private var isRunning: Bool { zone.scheduleStore.runningID == schedule.id }
     private var validationMessage: String? {
@@ -16,92 +22,100 @@ struct ScheduleEditorView: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                Section {
-                    Picker("Profile", selection: Binding(
-                        get: { schedule.profile(in: zone.profiles)?.id },
-                        set: { schedule.profileID = $0 }
-                    )) {
-                        if schedule.profile(in: zone.profiles) == nil {
-                            Text("Choose a profile").tag(nil as ZoneProfile.ID?)
-                                .disabled(true)
+            VStack(spacing: 0) {
+                ZoneTitle(isNew ? "New schedule" : "Edit schedule")
+                ScrollView {
+                    VStack(spacing: 0) {
+                        HStack(spacing: 16) {
+                            Text("Name").foregroundStyle(Color.zoneMute)
+                            TextField("Schedule", text: Binding(
+                                get: { schedule.name ?? "" }, set: { schedule.name = $0 }
+                            ))
+                            .textFieldStyle(.plain)
+                            .fontWeight(.semibold)
+                            .multilineTextAlignment(.trailing)
+                            .focused($editingName)
+                            .submitLabel(.done)
+                            .onSubmit { editingName = false }
+                            .accessibilityLabel("Schedule name")
+                            .accessibilityIdentifier("schedule-name")
                         }
-                        ForEach(zone.profiles.all) { profile in
-                            Text(profile.name).tag(Optional(profile.id))
+                        .frame(minHeight: 52)
+                        .contentShape(.rect)
+                        .onTapGesture { editingName = true }
+                        .disabled(isRunning)
+                        .opacity(isRunning ? 0.4 : 1)
+
+                        editRow("Profile", value: schedule.profile(in: zone.profiles)?.name ?? "Choose", field: .profile)
+                        editRow("Repeat", value: schedule.weekdays.isEmpty ? "Choose days" : schedule.daysText, field: .repeatDays)
+                            .padding(.top, 24)
+                        editRow("Start", value: ZoneSchedule.time(schedule.startMinute).formatted(date: .omitted, time: .shortened), field: .start)
+                        editRow(schedule.crossesMidnight ? "End next day" : "End",
+                                value: ZoneSchedule.time(schedule.endMinute).formatted(date: .omitted, time: .shortened), field: .end)
+                        Toggle(isOn: $schedule.isEnabled) {
+                            Text("Enabled").font(.body)
                         }
-                    }
-                    .pickerStyle(.menu)
-                    .tint(Color.zoneMute)
-                    .disabled(isRunning)
-                }
-                .listRowBackground(Color.zoneCard)
-                Section {
-                    VStack(alignment: .leading, spacing: 16) {
-                        Text("Repeat")
-                        if typeSize.isAccessibilitySize {
-                            ForEach(ZoneSchedule.orderedWeekdays, id: \.self) { day in
-                                dayButton(day, expanded: true)
+                        .toggleStyle(ZoneToggleStyle())
+                        .disabled(isRunning)
+                        .padding(.top, 24)
+
+                        if isRunning {
+                            note("Scan your tag on Home to edit this running schedule.")
+                        } else if let message = validationMessage {
+                            note(message)
+                        }
+                        if !isRunning && !isNew {
+                            Button(role: .destructive) {
+                                do {
+                                    try zone.scheduleStore.delete(schedule.id)
+                                    dismiss()
+                                } catch { errorMessage = error.localizedDescription }
+                            } label: {
+                                Text("Delete schedule")
+                                    .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
+                                    .contentShape(.rect)
                             }
-                        } else {
-                            HStack(spacing: 2) {
-                                ForEach(ZoneSchedule.orderedWeekdays, id: \.self) { day in
-                                    dayButton(day, expanded: false)
-                                }
-                            }
+                            .foregroundStyle(.red)
+                            .padding(.top, 24)
                         }
                     }
-                    .padding(.vertical, 8)
-                } footer: {
-                    if schedule.weekdays.isEmpty { Text("Choose at least one day.") }
+                    .font(.body)
+                    .buttonStyle(ZoneRowStyle())
+                    .padding(.horizontal, 24)
+                    .padding(.top, 24)
                 }
-                .listRowBackground(Color.zoneCard)
-                Section {
-                    timePicker("Start", minute: $schedule.startMinute)
-                    timePicker(schedule.crossesMidnight ? "End next day" : "End", minute: $schedule.endMinute)
-                } footer: {
-                    if isRunning {
-                        Text("Scan your tag on Home to edit this running schedule.")
-                    } else if let message = validationMessage, !schedule.weekdays.isEmpty {
-                        Text(message)
-                    } else {
-                        Text("Zone ends on time. Scan your tag to leave early.")
+                .scrollDismissesKeyboard(.interactively)
+            }
+            .safeAreaInset(edge: .bottom) {
+                if !isRunning {
+                    Button("Save schedule") {
+                        do {
+                            try zone.scheduleStore.save(schedule)
+                            dismiss()
+                        } catch { errorMessage = error.localizedDescription }
                     }
-                }
-                .listRowBackground(Color.zoneCard)
-                if !isRunning && !isNew {
-                    Section {
-                        Button("Delete schedule", role: .destructive) {
-                            do {
-                                try zone.scheduleStore.delete(schedule.id)
-                                dismiss()
-                            } catch { errorMessage = error.localizedDescription }
-                        }
-                        .frame(maxWidth: .infinity)
-                        .foregroundStyle(.red)
-                    }
-                    .listRowBackground(Color.zoneCard)
+                    .buttonStyle(ZoneButtonStyle())
+                    .disabled(validationMessage != nil)
+                    .padding(24)
+                    .background(Color.zoneBackground)
                 }
             }
-            .scrollContentBackground(.hidden)
-            .background(Color.zoneBackground)
-            .navigationTitle(isNew ? "New schedule" : "Edit schedule")
-            .navigationBarTitleDisplayMode(.inline)
+            .schedulePage()
             .toolbar {
-                ToolbarItem(placement: isRunning ? .confirmationAction : .cancellationAction) {
+                ToolbarItem(placement: .topBarTrailing) {
                     Button(isRunning ? "Done" : "Cancel") { dismiss() }
                 }
-                if !isRunning {
-                    ToolbarItem(placement: .confirmationAction) {
-                        Button("Save") {
-                            do {
-                                try zone.scheduleStore.save(schedule)
-                                dismiss()
-                            } catch { errorMessage = error.localizedDescription }
-                        }
-                        .fontWeight(.semibold)
-                        .disabled(validationMessage != nil)
-                        .opacity(validationMessage == nil ? 1 : 0.4)
-                    }
+            }
+            .sheet(item: $field) { field in
+                switch field {
+                case .profile:
+                    ScheduleProfileSheet(profileID: $schedule.profileID)
+                case .repeatDays:
+                    ScheduleDaysSheet(weekdays: $schedule.weekdays)
+                case .start:
+                    ScheduleTimeSheet(title: "Start time", minute: $schedule.startMinute)
+                case .end:
+                    ScheduleTimeSheet(title: "End time", minute: $schedule.endMinute)
                 }
             }
             .alert("Could not save schedule", isPresented: .init(
@@ -112,50 +126,23 @@ struct ScheduleEditorView: View {
                 Text(errorMessage ?? "")
             }
         }
-        .fontDesign(.rounded)
-        .foregroundStyle(Color.zoneInk)
-        .tint(Color.zoneBone)
-        .preferredColorScheme(.dark)
     }
 
-    private func timePicker(_ title: String, minute: Binding<Int>) -> some View {
-        DatePicker(title, selection: Binding(
-            get: { ZoneSchedule.time(minute.wrappedValue) },
-            set: { minute.wrappedValue = ZoneSchedule.minute($0) }
-        ), displayedComponents: .hourAndMinute)
+    private func editRow(_ title: String, value: String, field: Field) -> some View {
+        Button {
+            editingName = false
+            self.field = field
+        } label: {
+            ScheduleValueRow(title: title, value: value)
+        }
         .disabled(isRunning)
     }
 
-    private func dayButton(_ day: Int, expanded: Bool) -> some View {
-        let selected = schedule.weekdays.contains(day)
-        let name = Calendar.current.weekdaySymbols[day - 1]
-        let label = HStack {
-            Text(expanded ? name : Calendar.current.veryShortWeekdaySymbols[day - 1])
-                .font(expanded ? .body : .subheadline.weight(.semibold))
-            if expanded {
-                Spacer()
-            }
-        }
-        .padding(.horizontal, expanded ? 16 : 0)
-        .frame(maxWidth: .infinity, minHeight: 44)
-        .foregroundStyle(selected ? Color.zoneBackground : Color.zoneInk)
-        .background(selected ? Color.zoneBone : Color.zoneTrack, in: .capsule)
-        .contentShape(Rectangle())
-        return Group {
-            if isRunning {
-                label.opacity(0.4)
-            } else {
-                Button {
-                    if selected { schedule.weekdays.remove(day) }
-                    else { schedule.weekdays.insert(day) }
-                } label: {
-                    label
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        .accessibilityLabel(name)
-        .accessibilityValue(selected ? "Selected" : "Not selected")
-        .accessibilityAddTraits(selected ? .isSelected : [])
+    private func note(_ text: String) -> some View {
+        Text(text)
+            .font(.footnote)
+            .foregroundStyle(Color.zoneMute)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.top, 16)
     }
 }

@@ -179,6 +179,36 @@ struct ZoneScheduleTests {
 
 @MainActor
 struct ZoneScheduleStoreTests {
+    @Test func namesSurviveReloadAndRenameWithoutLosingOldSchedules() throws {
+        let name = "schedule-test-\(UUID())"
+        let defaults = try #require(UserDefaults(suiteName: name))
+        defer { defaults.removePersistentDomain(forName: name) }
+        let original = ZoneSchedule(weekdays: [1, 7], startMinute: 22 * 60, endMinute: 6 * 60)
+        var json = try #require(JSONSerialization.jsonObject(with: JSONEncoder().encode(original)) as? [String: Any])
+        json.removeValue(forKey: "name")
+        let legacy = try JSONDecoder().decode(ZoneSchedule.self, from: JSONSerialization.data(withJSONObject: json))
+        #expect(legacy.id == original.id)
+        #expect(legacy.weekdays == original.weekdays)
+        #expect(legacy.startMinute == original.startMinute)
+        #expect(legacy.endMinute == original.endMinute)
+        #expect(legacy.displayName == "Schedule")
+
+        json["name"] = "Weekend focus"
+        var named = try JSONDecoder().decode(ZoneSchedule.self, from: JSONSerialization.data(withJSONObject: json))
+        #expect(named.displayName == "Weekend focus")
+        let store = ZoneScheduleStore(defaults: defaults, startMonitoring: { _ in }, stopMonitoring: { _ in })
+        try store.save(named)
+        #expect(ZoneScheduleRuntime.schedules(in: defaults).first?.displayName == "Weekend focus")
+        named.name = "  Evening focus  "
+        try store.save(named)
+        let reloaded = try #require(ZoneScheduleRuntime.schedules(in: defaults).first)
+        #expect(reloaded.name == "Evening focus")
+        #expect(reloaded.id == original.id)
+        #expect(reloaded.weekdays == original.weekdays)
+        #expect(reloaded.startMinute == original.startMinute)
+        #expect(reloaded.endMinute == original.endMinute)
+    }
+
     @Test func emergencyExitClearsScheduledOwnershipAndKeepsTheHandledStart() throws {
         let name = "schedule-test-\(UUID())"
         let defaults = try #require(UserDefaults(suiteName: name))
@@ -452,5 +482,43 @@ struct ZoneScheduleStoreTests {
         #expect(throws: ScheduleError.self) { try store.delete(schedule.id, at: now) }
         #expect(registrations == 0)
         #expect(defaults.object(forKey: ZoneLock.Keys.zonedSince) as? Date == now)
+    }
+}
+
+struct ScheduleTimeInputTests {
+    @Test(arguments: [0, 1, 59, 60, 719, 720, 721, 1439] as [Int])
+    func bothClockFormatsPreserveTheExactTime(value: Int) {
+        #expect(ScheduleTimeInput(value: value, uses24HourClock: false).value == value)
+        #expect(ScheduleTimeInput(value: value, uses24HourClock: true).value == value)
+    }
+
+    @Test func midnightAndNoonUseTwelveWithTheSelectedPeriod() {
+        var input = ScheduleTimeInput(value: 0, uses24HourClock: false)
+        #expect(input.hour == "12")
+        #expect(input.minute == "00")
+        #expect(!input.isPM)
+        input.isPM = true
+        #expect(input.value == 720)
+        input.hour = "1"
+        input.minute = "05"
+        #expect(input.value == 785)
+    }
+
+    @Test(arguments: [("0", "00"), ("13", "00"), ("9", "60"), ("9", "-1"), ("", "00"), ("9", ""), ("abc", "00")])
+    func invalidTwelveHourInputCannotBeSaved(parts: (String, String)) {
+        var input = ScheduleTimeInput(value: 540, uses24HourClock: false)
+        input.hour = parts.0
+        input.minute = parts.1
+        #expect(input.value == nil)
+    }
+
+    @Test func twentyFourHourInputRejectsOutOfRangeHours() {
+        var input = ScheduleTimeInput(value: 540, uses24HourClock: true)
+        input.hour = "24"
+        #expect(input.value == nil)
+        input.hour = "-1"
+        #expect(input.value == nil)
+        input.hour = "0"
+        #expect(input.value == 0)
     }
 }

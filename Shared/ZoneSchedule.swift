@@ -2,6 +2,7 @@ import Foundation
 
 struct ZoneSchedule: Codable, Identifiable, Equatable {
     var id = UUID()
+    var name: String?
     var profileID: ZoneProfile.ID?
     var weekdays: Set<Int> = [2, 3, 4, 5, 6]
     var startMinute = 9 * 60
