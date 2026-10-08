@@ -249,7 +249,7 @@ private struct EmergencyHoldStyle: ButtonStyle {
                         Color.zoneBackground.opacity(0.2)
                             .scaleEffect(x: progress, anchor: .leading)
                     }
-                    .clipShape(.capsule)
+                    .clipShape(.zoneButton)
             }
             .scaleEffect(configuration.isPressed && !reduceMotion ? 0.97 : 1)
             .animation(.smooth(duration: 0.2), value: configuration.isPressed)

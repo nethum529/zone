@@ -195,7 +195,7 @@ struct ScheduleTimeSheet: View {
                 .fontWeight(.semibold)
                 .foregroundStyle(input.isPM == isPM ? Color.zoneBackground : Color.zoneInk)
                 .frame(minWidth: 56, minHeight: 44)
-                .background(input.isPM == isPM ? Color.zoneBone : Color.zoneTrack, in: .capsule)
+                .background(input.isPM == isPM ? Color.zoneBone : Color.zoneTrack, in: .zoneButton)
         }
         .buttonStyle(ZoneRowStyle())
         .accessibilityAddTraits(input.isPM == isPM ? .isSelected : [])

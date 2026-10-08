@@ -55,7 +55,7 @@ private enum ZoneTab: CaseIterable {
     }
 }
 
-// Three words at the bottom, lined up with the page edges. The current tab is in ink.
+// Three words at the bottom, a little inside the page edges. The current tab is in ink.
 private struct ZoneTabBar: View {
     @Binding var tab: ZoneTab
 
@@ -72,7 +72,7 @@ private struct ZoneTabBar: View {
         }
         .font(.system(size: 17, weight: .semibold))
         .buttonStyle(.plain)
-        .padding(.horizontal, 24)
+        .padding(.horizontal, 44)
         .background(Color.zoneBackground)
     }
 }
