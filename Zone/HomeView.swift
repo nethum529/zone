@@ -129,7 +129,10 @@ struct HomeView: View {
 
     private func act() async {
         if store.registeredTagID == nil {
-            if let id = await scanner.scan() { store.registerTag(id) }
+            if let id = await scanner.scan() {
+                do { try store.registerTag(id) }
+                catch { scanner.errorMessage = error.localizedDescription }
+            }
         } else if store.isZoned {
             guard let id = await scanner.scan() else { return }
             guard store.isRegisteredTag(id) else {

@@ -9,7 +9,8 @@ import Observation
 @Observable
 final class ZoneStore {
     private(set) var authorization: AuthorizationStatus
-    private(set) var registeredTagID: String?
+    let tags = ZoneTags()
+    var registeredTagID: String? { tags.mainID }
     private(set) var zonedSince: Date?
     // In Super Zone, the time when Zone locks again after the user leaves.
     private(set) var relockAt: Date?
@@ -47,7 +48,6 @@ final class ZoneStore {
 
     init() {
         authorization = AuthorizationCenter.shared.authorizationStatus
-        registeredTagID = defaults.string(forKey: Keys.tagID)
         superZone = defaults.bool(forKey: Keys.superZone)
         relockMinutes = defaults.object(forKey: Keys.relockMinutes) as? Int ?? Self.relockChoices[0]
         profiles = ZoneLock.profiles
@@ -85,13 +85,12 @@ final class ZoneStore {
         authorization = AuthorizationCenter.shared.authorizationStatus
     }
 
-    func registerTag(_ id: String) {
-        registeredTagID = id
-        defaults.set(id, forKey: Keys.tagID)
+    func registerTag(_ id: String) throws {
+        try tags.setMain(id)
     }
 
     func isRegisteredTag(_ id: String) -> Bool {
-        id == registeredTagID
+        tags.contains(id)
     }
 
     func enterZone() {

@@ -25,7 +25,7 @@ final class TagReader: NSObject, NFCTagReaderSessionDelegate, @unchecked Sendabl
     @MainActor
     func scan(prompt: String) async throws -> String {
         guard NFCTagReaderSession.readingAvailable else {
-            #if DEBUG
+            #if DEBUG && targetEnvironment(simulator)
             return Self.simulatedTagID
             #else
             throw TagReaderError.unavailable

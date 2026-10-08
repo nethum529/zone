@@ -2,13 +2,11 @@ import SwiftUI
 
 struct SettingsView: View {
     @Environment(ZoneStore.self) private var store
-    @State private var scanner = TagScanner()
+    @State private var showingTags = false
     @State private var showingProfiles = false
 
     var body: some View {
         @Bindable var store = store
-        // Only when unlocked, so a new tag or fewer blocked apps cannot be used to leave the Zone.
-        let locked = store.isZoned || store.relockAt != nil
         VStack(spacing: 0) {
             ZoneTitle("Settings")
             ScrollView {
@@ -16,14 +14,9 @@ struct SettingsView: View {
                     Button { showingProfiles = true } label: {
                         row("Profiles", value: store.profiles.current.name) { ZoneCaret() }
                     }
-                    Button {
-                        Task {
-                            if let id = await scanner.scan() { store.registerTag(id) }
-                        }
-                    } label: {
-                        row("Zone tag", value: store.registeredTagID == nil ? "Register" : "Change") { ZoneCaret() }
+                    Button { showingTags = true } label: {
+                        row("Zone tags", value: tagSummary) { ZoneCaret() }
                     }
-                    .disabled(locked)
                     VStack(spacing: 0) {
                         Toggle("Super Zone", isOn: $store.superZone)
                             .toggleStyle(ZoneToggleStyle())
@@ -51,7 +44,13 @@ struct SettingsView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.zoneBackground)
         .sheet(isPresented: $showingProfiles) { ProfilesView() }
-        .tagScanAlert(scanner)
+        .sheet(isPresented: $showingTags) { ZoneTagsView(tags: store.tags) }
+    }
+
+    private var tagSummary: String {
+        if store.tags.backupID != nil { "2 tags" }
+        else if store.tags.mainID != nil { "1 tag" }
+        else { "Register" }
     }
 
     // The same label and value row as on Home.
@@ -76,7 +75,7 @@ struct SettingsView: View {
 }
 
 // A settings row: dim when pressed, and faded like ZoneButtonStyle when disabled.
-private struct ZoneRowStyle: ButtonStyle {
+struct ZoneRowStyle: ButtonStyle {
     @Environment(\.isEnabled) private var isEnabled
 
     func makeBody(configuration: Configuration) -> some View {
