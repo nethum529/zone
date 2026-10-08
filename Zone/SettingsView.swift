@@ -42,6 +42,9 @@ struct SettingsView: View {
                     }
                     .disabled(store.relockAt != nil)
                     .padding(.top, 24)
+                    EmergencyUnlockSettingsRow { remaining in
+                        row("Emergency unlock", value: "\(remaining)") { ZoneCaret() }
+                    }
                 }
                 .buttonStyle(ZoneRowStyle())
                 .padding(.horizontal, 24)
