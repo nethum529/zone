@@ -8,6 +8,13 @@ struct ZoneApp: App {
         WindowGroup {
             ContentView()
                 .environment(store)
+                #if DEBUG
+                .overlay {
+                    if UserDefaults.standard.bool(forKey: "ZoneShieldPreview") {
+                        ShieldPreview(zonedSince: store.zonedSince)
+                    }
+                }
+                #endif
         }
     }
 }

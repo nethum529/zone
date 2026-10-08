@@ -1,6 +1,7 @@
 import SwiftUI
 
 // The colours of the bone design: warm white on black.
+// ZoneShield/ShieldLook.swift has a copy of these values. Change them together.
 extension Color {
     static let zoneBackground = Color(rgb: 0x0A0A0C)
     static let zoneCard = Color(rgb: 0x141418)
