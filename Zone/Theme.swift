@@ -57,51 +57,41 @@ struct ZoneButtonStyle: ButtonStyle {
     }
 }
 
-// A Settings row label: an icon tile and a title.
-struct ZoneRowLabel: View {
-    let icon: String
-    let title: String
+// A label and value row, as on Home and in Settings.
+struct ZoneRow<Trailing: View>: View {
+    let label: String
+    let value: String
+    let trailing: Trailing
 
-    init(_ icon: String, _ title: String) {
-        self.icon = icon
-        self.title = title
+    init(_ label: String, value: String, @ViewBuilder trailing: () -> Trailing) {
+        self.label = label
+        self.value = value
+        self.trailing = trailing()
     }
 
     var body: some View {
-        HStack(spacing: 12) {
-            Image(icon)
-                .resizable()
-                .frame(width: 18, height: 18)
-                .foregroundStyle(Color.zoneBone)
-                .frame(width: 30, height: 30)
-                .background(Color.zoneBone.opacity(0.14), in: .rect(cornerRadius: 9))
-            Text(title)
-                .foregroundStyle(Color.zoneInk)
+        HStack(spacing: 6) {
+            Text(label)
+                .foregroundStyle(Color.zoneMute)
+                .layoutPriority(1)
+            Spacer()
+            Text(value)
+                .fontWeight(.semibold)
+                .lineLimit(1)
+                .monospacedDigit()
+            trailing
+                // The caret ink ends 4 pt inside its frame. Line it up with the switch edge.
+                .padding(.trailing, -4)
         }
+        .font(.system(size: 17))
+        .frame(height: 52)
+        .contentShape(.rect)
     }
 }
 
-// A Settings row that opens something: label, value and caret.
-struct ZoneRow: View {
-    let icon: String
-    let title: String
-    let value: String
-
-    init(_ icon: String, _ title: String, value: String) {
-        self.icon = icon
-        self.title = title
-        self.value = value
-    }
-
-    var body: some View {
-        HStack {
-            ZoneRowLabel(icon, title)
-            Spacer()
-            Text(value)
-                .foregroundStyle(Color.zoneMute)
-                .lineLimit(1)
-            ZoneCaret()
-        }
+extension ZoneRow where Trailing == ZoneCaret {
+    init(_ label: String, value: String) {
+        self.init(label, value: value) { ZoneCaret() }
     }
 }
 
