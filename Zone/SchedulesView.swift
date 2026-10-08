@@ -5,6 +5,10 @@ struct SchedulesView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var editor: ZoneSchedule?
     @State private var errorMessage: String?
+    // The row that shows Delete now.
+    @State private var swiped: UUID?
+    // Deleted by swipe but still kept until the undo line hides.
+    @State private var pending: ZoneSchedule?
 
     private var store: ZoneScheduleStore { zone.scheduleStore }
 
@@ -12,53 +16,52 @@ struct SchedulesView: View {
         NavigationStack {
             VStack(spacing: 0) {
                 ZoneTitle("Schedules")
-                if store.schedules.isEmpty {
+                if visible.isEmpty {
                     Text("Enter and leave the Zone at set times.")
                         .foregroundStyle(Color.zoneMute)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(24)
                     Spacer()
                 } else {
-                    // A plain list keeps the native swipe action without grouped cards.
-                    List {
-                        ForEach(store.schedules) { schedule in
-                            Button { editor = schedule } label: {
-                                scheduleRow(schedule)
-                            }
-                            .buttonStyle(ZoneRowStyle())
-                            .accessibilityLabel("Edit \(schedule.displayName), \(schedule.daysText), \(schedule.timeText)")
-                            .listRowInsets(EdgeInsets(top: 0, leading: 24, bottom: 0, trailing: 24))
-                            .listRowSeparator(.hidden)
-                            .listRowBackground(Color.zoneBackground)
-                            .swipeActions {
-                                if store.runningID != schedule.id {
-                                    Button("Delete", role: .destructive) {
-                                        do { try store.delete(schedule.id) }
-                                        catch { errorMessage = error.localizedDescription }
-                                    }
-                                    .tint(.red)
+                    ScrollView {
+                        VStack(spacing: 0) {
+                            ForEach(visible) { schedule in
+                                Button { editor = schedule } label: {
+                                    scheduleRow(schedule)
+                                }
+                                .buttonStyle(ZoneRowStyle())
+                                .accessibilityLabel("Edit \(schedule.displayName), \(schedule.daysText), \(schedule.timeText)")
+                                .padding(.horizontal, 24)
+                                // A running schedule cannot be deleted.
+                                .swipeToDelete(schedule.id, open: $swiped, enabled: store.runningID != schedule.id) {
+                                    swipeDelete(schedule)
                                 }
                             }
-                        }
-                        if let setupMessage {
-                            Text(setupMessage)
-                                .font(.footnote)
-                                .foregroundStyle(Color.zoneMute)
-                                .listRowInsets(EdgeInsets(top: 16, leading: 24, bottom: 0, trailing: 24))
-                                .listRowSeparator(.hidden)
-                                .listRowBackground(Color.zoneBackground)
+                            if let setupMessage {
+                                Text(setupMessage)
+                                    .font(.footnote)
+                                    .foregroundStyle(Color.zoneMute)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(.horizontal, 24)
+                                    .padding(.top, 16)
+                            }
                         }
                     }
-                    .listStyle(.plain)
-                    .scrollContentBackground(.hidden)
                     .padding(.top, 24)
+                    .onScrollPhaseChange { _, phase in
+                        if phase != .idle { swiped = nil }
+                    }
                 }
             }
             .safeAreaInset(edge: .bottom) {
-                Button("Add schedule") { editor = ZoneSchedule(profileID: zone.profiles.currentID) }
-                    .buttonStyle(ZoneButtonStyle())
-                    .padding(24)
-                    .background(Color.zoneBackground)
+                Button("Add schedule") {
+                    if let pending { commit(pending) }
+                    editor = ZoneSchedule(profileID: zone.profiles.currentID)
+                }
+                .buttonStyle(ZoneButtonStyle())
+                .padding(24)
+                .undoLine($pending, text: { "\($0.displayName) deleted" }, commit: commit)
+                .background(Color.zoneBackground)
             }
             .schedulePage()
             .toolbar {
@@ -79,8 +82,28 @@ struct SchedulesView: View {
         }
     }
 
+    // The schedules on screen. One that waits for its undo line is already gone.
+    private var visible: [ZoneSchedule] {
+        store.schedules.filter { $0.id != pending?.id }
+    }
+
+    private func swipeDelete(_ schedule: ZoneSchedule) {
+        if let pending { commit(pending) }
+        withAnimation(.smooth(duration: 0.34)) {
+            swiped = nil
+            pending = schedule
+        }
+    }
+
+    // The undo line hid, so the delete is final. If the schedule started meanwhile, it comes back.
+    private func commit(_ schedule: ZoneSchedule) {
+        do { try store.delete(schedule.id) }
+        catch { errorMessage = error.localizedDescription }
+        withAnimation(.smooth(duration: 0.34)) { pending = nil }
+    }
+
     private var setupMessage: String? {
-        let enabled = store.schedules.filter(\.isEnabled)
+        let enabled = visible.filter(\.isEnabled)
         guard !enabled.isEmpty else { return nil }
         if zone.registeredTagID == nil { return "Register your tag on Home to use schedules." }
         let profiles = enabled.compactMap { $0.profile(in: zone.profiles) }
@@ -102,13 +125,17 @@ struct SchedulesView: View {
                     .font(.subheadline)
                     .foregroundStyle(Color.zoneMute)
             }
+            .swipeLabel()
             Spacer(minLength: 0)
-            if store.runningID == schedule.id {
-                Text("In the Zone").font(.subheadline).foregroundStyle(Color.zoneMute)
-            } else if !schedule.isEnabled {
-                Text("Off").font(.subheadline).foregroundStyle(Color.zoneMute)
+            HStack(spacing: 16) {
+                if store.runningID == schedule.id {
+                    Text("In the Zone").font(.subheadline).foregroundStyle(Color.zoneMute)
+                } else if !schedule.isEnabled {
+                    Text("Off").font(.subheadline).foregroundStyle(Color.zoneMute)
+                }
+                ZoneCaret().padding(.trailing, -4)
             }
-            ZoneCaret().padding(.trailing, -4)
+            .swipeValue()
         }
         .padding(.vertical, 16)
         .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)

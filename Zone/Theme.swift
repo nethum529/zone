@@ -9,6 +9,8 @@ extension Color {
     static let zoneMute = Color(rgb: 0x7C7C84)
     static let zoneTrack = Color(rgb: 0x1C1C22)
     static let zoneBone = Color(rgb: 0xECE6DA)
+    // Only for the Delete that a swipe shows. A soft red for the dark page.
+    static let zoneDelete = Color(rgb: 0xFF6961)
 
     init(rgb: UInt32) {
         self.init(
