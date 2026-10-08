@@ -14,27 +14,27 @@ struct SettingsView: View {
             Form {
                 Section {
                     Button { showingProfiles = true } label: {
-                        row("stack-fill", "Profiles", value: "\(store.profiles.all.count)")
+                        ZoneRow("stack-fill", "Profiles", value: store.profiles.current.name)
                     }
                     Button {
                         Task {
                             if let id = await scanner.scan() { store.registerTag(id) }
                         }
                     } label: {
-                        row("contactless-payment-fill", "Zone tag", value: store.registeredTagID == nil ? "Register" : "Change")
+                        ZoneRow("contactless-payment-fill", "Zone tag", value: store.registeredTagID == nil ? "Register" : "Change")
                     }
                     .disabled(locked)
                 }
                 .listRowBackground(Color.zoneCard)
                 Section {
                     Toggle(isOn: $store.superZone) {
-                        label("lightning-fill", "Super Zone")
+                        ZoneRowLabel("lightning-fill", "Super Zone")
                     }
                     .tint(Color.zoneBone)
                     Picker(selection: $store.relockMinutes) {
                         ForEach(ZoneStore.relockChoices, id: \.self) { Text("\($0) min") }
                     } label: {
-                        label("timer-fill", "Relock after")
+                        ZoneRowLabel("timer-fill", "Relock after")
                     }
                     .tint(Color.zoneMute)
                 } footer: {
@@ -49,31 +49,5 @@ struct SettingsView: View {
         .background(Color.zoneBackground)
         .sheet(isPresented: $showingProfiles) { ProfilesView() }
         .tagScanAlert(scanner)
-    }
-
-    private func label(_ icon: String, _ title: String) -> some View {
-        HStack(spacing: 12) {
-            Image(icon)
-                .resizable()
-                .frame(width: 18, height: 18)
-                .foregroundStyle(Color.zoneBone)
-                .frame(width: 30, height: 30)
-                .background(Color.zoneBone.opacity(0.14), in: .rect(cornerRadius: 9))
-            Text(title)
-                .foregroundStyle(Color.zoneInk)
-        }
-    }
-
-    private func row(_ icon: String, _ title: String, value: String) -> some View {
-        HStack {
-            label(icon, title)
-            Spacer()
-            Text(value)
-                .foregroundStyle(Color.zoneMute)
-            Image("caret-right")
-                .resizable()
-                .frame(width: 14, height: 14)
-                .foregroundStyle(Color.zoneMute)
-        }
     }
 }

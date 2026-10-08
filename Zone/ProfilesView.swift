@@ -9,11 +9,6 @@ struct ProfilesView: View {
     @State private var adding = false
     @State private var newName = ""
 
-    init() {
-        // Alert text fields ignore the SwiftUI tint, so set the cursor color here.
-        UITextField.appearance(whenContainedInInstancesOf: [UIAlertController.self]).tintColor = UIColor(Color.zoneInk)
-    }
-
     var body: some View {
         NavigationStack(path: $path) {
             VStack(spacing: 0) {
@@ -29,7 +24,7 @@ struct ProfilesView: View {
                                     Spacer()
                                     Text(appsText(profile.selection))
                                         .foregroundStyle(Color.zoneMute)
-                                    ProfileCaret()
+                                    ZoneCaret()
                                 }
                             }
                         }
@@ -64,7 +59,6 @@ struct ProfilesView: View {
         }
         .tint(Color.zoneInk)
         .presentationBackground(Color.zoneBackground)
-        .presentationDragIndicator(.visible)
     }
 }
 
@@ -89,22 +83,7 @@ private struct ProfileView: View {
             Form {
                 Section {
                     Button { picking = true } label: {
-                        HStack {
-                            HStack(spacing: 12) {
-                                Image("prohibit-fill")
-                                    .resizable()
-                                    .frame(width: 18, height: 18)
-                                    .foregroundStyle(Color.zoneBone)
-                                    .frame(width: 30, height: 30)
-                                    .background(Color.zoneBone.opacity(0.14), in: .rect(cornerRadius: 9))
-                                Text("Blocked apps")
-                                    .foregroundStyle(Color.zoneInk)
-                            }
-                            Spacer()
-                            Text(appsText(profile?.selection ?? FamilyActivitySelection()))
-                                .foregroundStyle(Color.zoneMute)
-                            ProfileCaret()
-                        }
+                        ZoneRow("prohibit-fill", "Blocked apps", value: appsText(profile?.selection ?? FamilyActivitySelection()))
                     }
                     .disabled(inUse)
                 }
@@ -136,7 +115,7 @@ private struct ProfileView: View {
             Button("Rename") { store.profiles.rename(id, to: newName) }
                 .disabled(isBlank(newName))
         }
-        .confirmationDialog("Delete this profile?", isPresented: $confirmingDelete, titleVisibility: .visible) {
+        .confirmationDialog("Delete \(profile?.name ?? "")?", isPresented: $confirmingDelete, titleVisibility: .visible) {
             Button("Delete profile", role: .destructive) {
                 dismiss()
                 store.profiles.delete(id)
@@ -151,15 +130,6 @@ private struct ProfileView: View {
         } set: {
             store.profiles.setSelection($0, for: id)
         }
-    }
-}
-
-private struct ProfileCaret: View {
-    var body: some View {
-        Image("caret-right")
-            .resizable()
-            .frame(width: 14, height: 14)
-            .foregroundStyle(Color.zoneMute)
     }
 }
 

@@ -55,3 +55,61 @@ struct ZoneButtonStyle: ButtonStyle {
             .animation(.smooth(duration: 0.2), value: configuration.isPressed)
     }
 }
+
+// A Settings row label: an icon tile and a title.
+struct ZoneRowLabel: View {
+    let icon: String
+    let title: String
+
+    init(_ icon: String, _ title: String) {
+        self.icon = icon
+        self.title = title
+    }
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(icon)
+                .resizable()
+                .frame(width: 18, height: 18)
+                .foregroundStyle(Color.zoneBone)
+                .frame(width: 30, height: 30)
+                .background(Color.zoneBone.opacity(0.14), in: .rect(cornerRadius: 9))
+            Text(title)
+                .foregroundStyle(Color.zoneInk)
+        }
+    }
+}
+
+// A Settings row that opens something: label, value and caret.
+struct ZoneRow: View {
+    let icon: String
+    let title: String
+    let value: String
+
+    init(_ icon: String, _ title: String, value: String) {
+        self.icon = icon
+        self.title = title
+        self.value = value
+    }
+
+    var body: some View {
+        HStack {
+            ZoneRowLabel(icon, title)
+            Spacer()
+            Text(value)
+                .foregroundStyle(Color.zoneMute)
+                .lineLimit(1)
+            ZoneCaret()
+        }
+    }
+}
+
+// The caret at the end of a row that opens something.
+struct ZoneCaret: View {
+    var body: some View {
+        Image("caret-right")
+            .resizable()
+            .frame(width: 14, height: 14)
+            .foregroundStyle(Color.zoneMute)
+    }
+}
