@@ -35,8 +35,9 @@ final class ZoneStore {
     }
 
     var isZoned: Bool { zonedSince != nil }
-    // Zoned, or Zone locks again soon. Then the current profile cannot change.
-    var isLocked: Bool { isZoned || relockAt != nil }
+    // In the Zone, the current profile cannot change.
+    // While Zone waits to lock again, a new choice is the profile the relock uses.
+    var isLocked: Bool { isZoned }
     var hasBlockedItems: Bool {
         !selection.applicationTokens.isEmpty
             || !selection.categoryTokens.isEmpty
