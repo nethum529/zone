@@ -39,7 +39,12 @@ struct ZoneTitle: View {
     }
 }
 
-// The one main button style: a bone capsule with dark text.
+// Buttons are rounded rectangles, a little less round than a capsule.
+extension Shape where Self == RoundedRectangle {
+    static var zoneButton: RoundedRectangle { RoundedRectangle(cornerRadius: 18, style: .continuous) }
+}
+
+// The one main button style: a bone rounded rectangle with dark text.
 struct ZoneButtonStyle: ButtonStyle {
     @Environment(\.isEnabled) private var isEnabled
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -50,7 +55,7 @@ struct ZoneButtonStyle: ButtonStyle {
             .foregroundStyle(Color.zoneBackground)
             .frame(maxWidth: .infinity)
             .frame(height: 56)
-            .background(Color.zoneBone, in: .capsule)
+            .background(Color.zoneBone, in: .zoneButton)
             .scaleEffect(isEnabled && configuration.isPressed && !reduceMotion ? 0.97 : 1)
             .opacity(isEnabled ? (configuration.isPressed && reduceMotion ? 0.8 : 1) : 0.4)
             .animation(.smooth(duration: 0.2), value: configuration.isPressed)
