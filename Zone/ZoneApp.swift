@@ -16,7 +16,7 @@ struct ZoneApp: App {
                 #if DEBUG
                 .overlay {
                     if UserDefaults.standard.bool(forKey: "ZoneShieldPreview") {
-                        ShieldPreview(zonedSince: store.zonedSince)
+                        ShieldPreview()
                     }
                 }
                 #endif

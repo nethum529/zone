@@ -21,13 +21,12 @@ final class ShieldConfigurationExtension: ShieldConfigurationDataSource {
     }
 
     private var zone: ShieldConfiguration {
-        let zonedSince = ZoneLock.defaults.object(forKey: ZoneLock.Keys.zonedSince) as? Date
-        return ShieldConfiguration(
+        ShieldConfiguration(
             backgroundBlurStyle: ShieldLook.blurStyle,
             backgroundColor: ShieldLook.background,
             icon: ShieldLook.icon,
             title: .init(text: ShieldLook.title, color: ShieldLook.ink),
-            subtitle: .init(text: ShieldLook.subtitle(zonedSince: zonedSince, now: .now), color: ShieldLook.mute),
+            subtitle: .init(text: ShieldLook.subtitle, color: ShieldLook.mute),
             primaryButtonLabel: .init(text: ShieldLook.button, color: ShieldLook.black),
             primaryButtonBackgroundColor: ShieldLook.bone
         )
