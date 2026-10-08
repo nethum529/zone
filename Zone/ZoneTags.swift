@@ -23,14 +23,29 @@ enum ZoneTagError: LocalizedError, Equatable {
 final class ZoneTags {
     private(set) var mainID: String?
     private(set) var backupID: String?
+    // Names the user gives the tags, like Desk or Keychain.
+    private(set) var mainName: String?
+    private(set) var backupName: String?
 
     private let defaults: UserDefaults
     private static let backupKey = "backupTagID"
+    private static let mainNameKey = "mainTagName"
+    private static let backupNameKey = "backupTagName"
 
     init(defaults: UserDefaults = ZoneLock.defaults) {
         self.defaults = defaults
         mainID = defaults.string(forKey: ZoneLock.Keys.tagID)
         backupID = defaults.string(forKey: Self.backupKey)
+        mainName = defaults.string(forKey: Self.mainNameKey)
+        backupName = defaults.string(forKey: Self.backupNameKey)
+    }
+
+    // An empty name removes the name.
+    func setName(_ name: String, backup: Bool) {
+        let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let key = backup ? Self.backupNameKey : Self.mainNameKey
+        if name.isEmpty { defaults.removeObject(forKey: key) } else { defaults.set(name, forKey: key) }
+        if backup { backupName = name.isEmpty ? nil : name } else { mainName = name.isEmpty ? nil : name }
     }
 
     var requiresVerification: Bool {
@@ -61,6 +76,7 @@ final class ZoneTags {
         try validateChange(verifiedBy: savedID)
         defaults.removeObject(forKey: Self.backupKey)
         backupID = nil
+        setName("", backup: true)
     }
 
     private func validateChange(verifiedBy savedID: String?) throws {
