@@ -75,6 +75,9 @@ struct ZoneScheduleRun: Codable, Equatable {
     let scheduleID: UUID
     let interval: DateInterval
     let zonedSince: Date
+    // Set when the schedule took over a Zone the user entered. At the end this profile
+    // comes back and the Zone stays on, because only the tag ends a Zone the user entered.
+    var previousProfileID: ZoneProfile.ID?
 }
 
 // Remember each start even when it was skipped or the user left with their tag.
@@ -89,8 +92,10 @@ struct ZoneScheduleState: Codable {
         guard let interval = schedule.interval(at: now, calendar: calendar),
               handledStarts[schedule.id] != interval.start else { return nil }
         handledStarts[schedule.id] = interval.start
-        guard zonedSince == nil, !wasZonedAtStart, canEnter else { return nil }
-        let started = ZoneScheduleRun(scheduleID: schedule.id, interval: interval, zonedSince: now)
+        guard !wasZonedAtStart, canEnter else { return nil }
+        // In a Zone the user entered, the schedule takes over. A running schedule is never replaced.
+        if zonedSince != nil, run != nil { return nil }
+        let started = ZoneScheduleRun(scheduleID: schedule.id, interval: interval, zonedSince: zonedSince ?? now)
         run = started
         return started
     }
