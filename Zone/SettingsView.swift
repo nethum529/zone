@@ -1,10 +1,9 @@
-import FamilyControls
 import SwiftUI
 
 struct SettingsView: View {
     @Environment(ZoneStore.self) private var store
     @State private var scanner = TagScanner()
-    @State private var showingPicker = false
+    @State private var showingProfiles = false
 
     var body: some View {
         @Bindable var store = store
@@ -14,10 +13,9 @@ struct SettingsView: View {
             ZoneTitle("Settings")
             Form {
                 Section {
-                    Button { showingPicker = true } label: {
-                        row("prohibit-fill", "Blocked apps", value: blockedText)
+                    Button { showingProfiles = true } label: {
+                        row("stack-fill", "Profiles", value: "\(store.profiles.all.count)")
                     }
-                    .disabled(locked)
                     Button {
                         Task {
                             if let id = await scanner.scan() { store.registerTag(id) }
@@ -49,15 +47,8 @@ struct SettingsView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.zoneBackground)
-        .familyActivityPicker(isPresented: $showingPicker, selection: $store.selection)
+        .sheet(isPresented: $showingProfiles) { ProfilesView() }
         .tagScanAlert(scanner)
-    }
-
-    private var blockedText: String {
-        let count = store.selection.applicationTokens.count
-            + store.selection.categoryTokens.count
-            + store.selection.webDomainTokens.count
-        return count == 0 ? "None" : "\(count) app\(count == 1 ? "" : "s")"
     }
 
     private func label(_ icon: String, _ title: String) -> some View {

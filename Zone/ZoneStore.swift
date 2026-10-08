@@ -23,11 +23,18 @@ final class ZoneStore {
     var relockMinutes: Int {
         didSet { defaults.set(relockMinutes, forKey: Keys.relockMinutes) }
     }
+    var profiles: ZoneProfiles {
+        didSet { profiles.save(to: defaults) }
+    }
+    // The apps of the current profile.
     var selection: FamilyActivitySelection {
-        didSet { defaults.set(try? JSONEncoder().encode(selection), forKey: Keys.selection) }
+        get { profiles.current.selection }
+        set { profiles.setSelection(newValue, for: profiles.currentID) }
     }
 
     var isZoned: Bool { zonedSince != nil }
+    // Zoned, or Zone locks again soon. Then the current profile cannot change.
+    var isLocked: Bool { isZoned || relockAt != nil }
     var hasBlockedItems: Bool {
         !selection.applicationTokens.isEmpty
             || !selection.categoryTokens.isEmpty
@@ -43,7 +50,7 @@ final class ZoneStore {
         registeredTagID = defaults.string(forKey: Keys.tagID)
         superZone = defaults.bool(forKey: Keys.superZone)
         relockMinutes = defaults.object(forKey: Keys.relockMinutes) as? Int ?? Self.relockChoices[0]
-        selection = ZoneLock.selection
+        profiles = ZoneLock.profiles
         sessions = defaults.data(forKey: Keys.sessions)
             .flatMap { try? JSONDecoder().decode([ZoneSession].self, from: $0) } ?? []
         refresh()
@@ -54,6 +61,8 @@ final class ZoneStore {
     func refresh() {
         zonedSince = defaults.object(forKey: Keys.zonedSince) as? Date
         relockAt = defaults.object(forKey: Keys.relockAt) as? Date
+        let saved = ZoneLock.profiles
+        if saved != profiles { profiles = saved }
         if !isZoned, let relockAt, relockAt <= .now {
             enterZone()
         }

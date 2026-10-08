@@ -13,7 +13,9 @@ enum ZoneLock {
     static var relockActivity: DeviceActivityName { DeviceActivityName("relock") }
 
     enum Keys {
+        // Before profiles, the one selection. Kept so the first profile can be made from it.
         static let selection = "selection"
+        static let profiles = "profiles"
         static let tagID = "tagID"
         static let zonedSince = "zonedSince"
         static let superZone = "superZone"
@@ -22,11 +24,17 @@ enum ZoneLock {
         static let sessions = "sessions"
     }
 
-    static var selection: FamilyActivitySelection {
-        guard let data = defaults.data(forKey: Keys.selection),
-              let selection = try? JSONDecoder().decode(FamilyActivitySelection.self, from: data)
-        else { return FamilyActivitySelection() }
-        return selection
+    static var profiles: ZoneProfiles { ZoneProfiles.load(from: defaults) }
+
+    // The apps of the current profile. A relock uses this, so it locks the last used profile.
+    static var selection: FamilyActivitySelection { profiles.current.selection }
+
+    // Makes this profile current, then locks. An unknown id keeps the current profile.
+    static func lock(profile id: ZoneProfile.ID) {
+        var profiles = profiles
+        profiles.choose(id)
+        profiles.save(to: defaults)
+        lock()
     }
 
     static func lock() {
