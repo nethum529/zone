@@ -20,6 +20,12 @@ targets:
       - target: ZoneWidget
     scheme:
       testTargets: [ZoneTests]
+    # The launch screen is the Zone background, so the launch animation starts on the same colour.
+    info:
+      path: Zone/Info.plist
+      properties:
+        UILaunchScreen:
+          UIColorName: LaunchBackground
     entitlements:
       path: Zone/Zone.entitlements
       properties:
@@ -34,7 +40,6 @@ targets:
         INFOPLIST_KEY_CFBundleDisplayName: Zone
         INFOPLIST_KEY_NFCReaderUsageDescription: Zone reads your tag to start and end a session.
         INFOPLIST_KEY_NSSupportsLiveActivities: YES
-        INFOPLIST_KEY_UILaunchScreen_Generation: YES
         INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
         INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
         INFOPLIST_KEY_UIRequiresFullScreen: YES

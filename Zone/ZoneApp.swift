@@ -12,6 +12,7 @@ struct ZoneApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .launchAnimation()
                 .environment(store)
                 #if DEBUG
                 .overlay {
