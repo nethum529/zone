@@ -13,44 +13,54 @@ struct SchedulesView: View {
             VStack(spacing: 0) {
                 ZoneTitle("Schedules")
                 if store.schedules.isEmpty {
-                    VStack(alignment: .leading, spacing: 0) {
-                        Text("Enter and leave the Zone at set times.")
-                            .font(.body)
-                            .foregroundStyle(Color.zoneMute)
-                        Spacer()
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(24)
+                    Text("Enter and leave the Zone at set times.")
+                        .foregroundStyle(Color.zoneMute)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(24)
+                    Spacer()
                 } else {
+                    // A plain list keeps the native swipe action without grouped cards.
                     List {
-                        Section {
-                            ForEach(store.schedules) { schedule in
+                        ForEach(store.schedules) { schedule in
+                            Button { editor = schedule } label: {
                                 scheduleRow(schedule)
-                                    .listRowBackground(Color.zoneCard)
-                                    .swipeActions {
-                                        if store.runningID != schedule.id {
-                                            Button("Delete", role: .destructive) {
-                                                do { try store.delete(schedule.id) }
-                                                catch { errorMessage = error.localizedDescription }
-                                            }
-                                            .tint(.red)
-                                        }
-                                    }
                             }
-                        } footer: {
-                            if let setupMessage { Text(setupMessage) }
+                            .buttonStyle(ZoneRowStyle())
+                            .accessibilityLabel("Edit \(schedule.displayName), \(schedule.daysText), \(schedule.timeText)")
+                            .listRowInsets(EdgeInsets(top: 0, leading: 24, bottom: 0, trailing: 24))
+                            .listRowSeparator(.hidden)
+                            .listRowBackground(Color.zoneBackground)
+                            .swipeActions {
+                                if store.runningID != schedule.id {
+                                    Button("Delete", role: .destructive) {
+                                        do { try store.delete(schedule.id) }
+                                        catch { errorMessage = error.localizedDescription }
+                                    }
+                                    .tint(.red)
+                                }
+                            }
+                        }
+                        if let setupMessage {
+                            Text(setupMessage)
+                                .font(.footnote)
+                                .foregroundStyle(Color.zoneMute)
+                                .listRowInsets(EdgeInsets(top: 16, leading: 24, bottom: 0, trailing: 24))
+                                .listRowSeparator(.hidden)
+                                .listRowBackground(Color.zoneBackground)
                         }
                     }
+                    .listStyle(.plain)
                     .scrollContentBackground(.hidden)
+                    .padding(.top, 24)
                 }
             }
             .safeAreaInset(edge: .bottom) {
                 Button("Add schedule") { editor = ZoneSchedule(profileID: zone.profiles.currentID) }
                     .buttonStyle(ZoneButtonStyle())
                     .padding(24)
+                    .background(Color.zoneBackground)
             }
-            .background(Color.zoneBackground)
-            .navigationBarTitleDisplayMode(.inline)
+            .schedulePage()
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Done") { dismiss() }
@@ -67,10 +77,6 @@ struct SchedulesView: View {
                 Text(errorMessage ?? "")
             }
         }
-        .fontDesign(.rounded)
-        .foregroundStyle(Color.zoneInk)
-        .tint(Color.zoneBone)
-        .preferredColorScheme(.dark)
     }
 
     private var setupMessage: String? {
@@ -88,33 +94,24 @@ struct SchedulesView: View {
 
     private func scheduleRow(_ schedule: ZoneSchedule) -> some View {
         HStack(spacing: 16) {
-            Button { editor = schedule } label: {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(schedule.timeText)
-                        .font(.body)
-                        .foregroundStyle(Color.zoneInk)
-                    Text(schedule.daysText + (store.runningID == schedule.id ? " · In the Zone" : ""))
-                        .font(.subheadline)
-                        .foregroundStyle(Color.zoneMute)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .contentShape(Rectangle())
+            VStack(alignment: .leading, spacing: 8) {
+                Text(schedule.displayName)
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(Color.zoneInk)
+                Text("\(schedule.daysText) · \(schedule.timeText)")
+                    .font(.subheadline)
+                    .foregroundStyle(Color.zoneMute)
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Edit schedule, \(schedule.daysText), \(schedule.timeText)")
-            Toggle("Enabled", isOn: Binding(
-                get: { schedule.isEnabled },
-                set: { enabled in
-                    var updated = schedule
-                    updated.isEnabled = enabled
-                    do { try store.save(updated) }
-                    catch { errorMessage = error.localizedDescription }
-                }
-            ))
-            .labelsHidden()
-            .toggleStyle(ZoneToggleStyle(showsLabel: false))
-            .disabled(store.runningID == schedule.id)
-            .accessibilityLabel("\(schedule.daysText), \(schedule.timeText)")
+            Spacer(minLength: 0)
+            if store.runningID == schedule.id {
+                Text("In the Zone").font(.subheadline).foregroundStyle(Color.zoneMute)
+            } else if !schedule.isEnabled {
+                Text("Off").font(.subheadline).foregroundStyle(Color.zoneMute)
+            }
+            ZoneCaret().padding(.trailing, -4)
         }
+        .padding(.vertical, 16)
+        .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
+        .contentShape(.rect)
     }
 }

@@ -46,6 +46,7 @@ final class ZoneScheduleStore {
     func save(_ draft: ZoneSchedule, at now: Date = .now) throws {
         if let message = draft.validationMessage { throw ScheduleError(message: message) }
         var schedule = draft
+        schedule.name = draft.name?.trimmingCharacters(in: .whitespacesAndNewlines)
         let previous = try ZoneLock.withStateLock {
             try requireEditable(draft.id, at: now)
             guard let profile = schedule.profile(in: ZoneProfiles.load(from: defaults)) else {
