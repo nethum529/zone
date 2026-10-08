@@ -46,6 +46,9 @@ struct HomeView: View {
             .frame(height: 4)
             .padding(.top, 26)
             VStack(spacing: 0) {
+                if store.profiles.all.count > 1 {
+                    ProfileMenu()
+                }
                 if let since = store.zonedSince {
                     Group {
                         row("Session start", since.formatted(date: .omitted, time: .shortened))
