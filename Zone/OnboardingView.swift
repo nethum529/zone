@@ -26,6 +26,8 @@ struct OnboardingView: View {
                 }
             }
             .transition(.opacity)
+            // Keep the bar on every step, so the title does not move when Skip shows.
+            .toolbarVisibility(.visible, for: .navigationBar)
             .toolbarBackground(Color.zoneBackground, for: .navigationBar)
             .navigationBarTitleDisplayMode(.inline)
         }
@@ -44,7 +46,7 @@ struct OnboardingView: View {
 
     // The default profile blocks social apps. iOS only lets the user choose apps, so the list opens with a hint.
     private var profile: some View {
-        page("Your first profile", "Start with your social apps. In the list, tap Social, then Done.") {
+        page("Your first profile", "Start with your social apps. In the list, tap the circle next to Social, then the check.") {
             Button(store.hasBlockedItems ? "Next" : "Choose apps") {
                 if store.hasBlockedItems { go(to: .tagName) } else { picking = true }
             }
@@ -57,7 +59,7 @@ struct OnboardingView: View {
     }
 
     private var scan: some View {
-        page("Scan your tag", "Hold the top of your iPhone near \(store.tags.mainName ?? "your tag"). Your apps are blocked right away. Scan it again to leave.") {
+        page("Scan your tag", "Hold the top of your iPhone near your tag. Your apps are blocked right away. Scan it again to leave.") {
             Button("Scan tag") {
                 Task { await register() }
             }
