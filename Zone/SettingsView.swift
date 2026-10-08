@@ -5,9 +5,9 @@ struct SettingsView: View {
     @State private var showingTags = false
     @State private var showingProfiles = false
     @State private var showingSchedules = false
+    @State private var showingSuperZone = false
 
     var body: some View {
-        @Bindable var store = store
         VStack(spacing: 0) {
             ZoneTitle("Settings")
             ScrollView {
@@ -21,28 +21,9 @@ struct SettingsView: View {
                     Button { showingSchedules = true } label: {
                         row("Schedules", value: scheduleText)
                     }
-                    VStack(spacing: 0) {
-                        Toggle(isOn: $store.superZone) {
-                            Text("Super Zone")
-                                .font(.system(size: 20, weight: .medium))
-                                .foregroundStyle(Color.zoneInk)
-                        }
-                        .toggleStyle(ZoneToggleStyle())
-                        .frame(height: 64)
-                        Menu {
-                            Picker("Relock after", selection: $store.relockMinutes) {
-                                ForEach(ZoneStore.relockChoices, id: \.self) { Text("\($0) min") }
-                            }
-                        } label: {
-                            row("Relock after", value: "\(store.relockMinutes) min") {
-                                Image("caret-up-down")
-                                    .resizable()
-                                    .frame(width: 14, height: 14)
-                                    .foregroundStyle(Color.zoneMute)
-                            }
-                        }
+                    Button { showingSuperZone = true } label: {
+                        row("Super Zone", value: store.superZone ? "\(store.relockMinutes) min" : "Off")
                     }
-                    .disabled(store.relockAt != nil)
                     EmergencyUnlockSettingsRow { remaining in
                         row("Emergency unlock", value: "\(remaining)")
                     }
@@ -57,6 +38,7 @@ struct SettingsView: View {
         .sheet(isPresented: $showingProfiles) { ProfilesView() }
         .sheet(isPresented: $showingTags) { ZoneTagsView(tags: store.tags) }
         .sheet(isPresented: $showingSchedules) { SchedulesView() }
+        .sheet(isPresented: $showingSuperZone) { SuperZoneView() }
     }
 
     // One list, one row: label and value in ink at one size, no gaps or lines.
