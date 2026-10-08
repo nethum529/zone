@@ -17,6 +17,7 @@ struct ContentView: View {
         .foregroundStyle(Color.zoneInk)
         .preferredColorScheme(.dark)
         .task { await store.watchAuthorization() }
+        .syncsLockScreen(zonedSince: store.zonedSince)
     }
 }
 
