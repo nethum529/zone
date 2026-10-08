@@ -65,6 +65,7 @@ private struct MainView: View {
             }
         }
         .tint(Color.zoneInk)
+        .modifier(ScheduleRefresh())
         .onChange(of: scenePhase) {
             if scenePhase == .active { store.refresh() }
         }

@@ -8,6 +8,7 @@ import Observation
 @MainActor
 @Observable
 final class ZoneStore {
+    let scheduleStore: ZoneScheduleStore
     private(set) var authorization: AuthorizationStatus
     let tags = ZoneTags()
     var registeredTagID: String? { tags.mainID }
@@ -48,10 +49,11 @@ final class ZoneStore {
 
     init(defaults: UserDefaults = ZoneLock.defaults) {
         self.defaults = defaults
+        scheduleStore = ZoneScheduleStore(defaults: defaults)
         authorization = AuthorizationCenter.shared.authorizationStatus
         superZone = defaults.bool(forKey: Keys.superZone)
         relockMinutes = defaults.object(forKey: Keys.relockMinutes) as? Int ?? Self.relockChoices[0]
-        profiles = ZoneLock.profiles
+        profiles = ZoneProfiles.load(from: defaults)
         sessions = defaults.data(forKey: Keys.sessions)
             .flatMap { try? JSONDecoder().decode([ZoneSession].self, from: $0) } ?? []
         refresh()
@@ -60,9 +62,13 @@ final class ZoneStore {
     // Reads the lock state again, because the monitor extension can change it.
     // If the relock time passed and the extension did not lock, lock now.
     func refresh() {
+        ZoneScheduleRuntime.reconcile(in: defaults)
+        scheduleStore.refresh()
+        sessions = defaults.data(forKey: Keys.sessions)
+            .flatMap { try? JSONDecoder().decode([ZoneSession].self, from: $0) } ?? []
         zonedSince = defaults.object(forKey: Keys.zonedSince) as? Date
         relockAt = defaults.object(forKey: Keys.relockAt) as? Date
-        let saved = ZoneLock.profiles
+        let saved = ZoneProfiles.load(from: defaults)
         if saved != profiles { profiles = saved }
         if !isZoned, let relockAt, relockAt <= .now {
             enterZone()
@@ -96,7 +102,7 @@ final class ZoneStore {
 
     func enterZone() {
         activityCenter.stopMonitoring([ZoneLock.relockActivity])
-        ZoneLock.lock()
+        ZoneLock.lock(in: defaults)
         refresh()
     }
 
@@ -110,12 +116,7 @@ final class ZoneStore {
         guard isZoned else { return }
         defaults.removeObject(forKey: Keys.relockAt)
         activityCenter.stopMonitoring([ZoneLock.relockActivity])
-        if let zonedSince {
-            sessions.append(ZoneSession(start: zonedSince, end: .now))
-            defaults.set(try? JSONEncoder().encode(sessions), forKey: Keys.sessions)
-        }
-        ZoneLock.shields.clearAllSettings()
-        defaults.removeObject(forKey: Keys.zonedSince)
+        ZoneLock.unlock(in: defaults)
         if superZone && allowRelock {
             scheduleRelock()
         }
@@ -145,7 +146,12 @@ final class ZoneStore {
             intervalEnd: Calendar.current.dateComponents(parts, from: end),
             repeats: false
         )
-        defaults.set(end, forKey: Keys.relockAt)
+        let shouldMonitor = ZoneLock.withStateLock {
+            guard defaults.object(forKey: Keys.zonedSince) == nil else { return false }
+            defaults.set(end, forKey: Keys.relockAt)
+            return true
+        }
+        guard shouldMonitor else { return }
         do {
             try activityCenter.startMonitoring(ZoneLock.relockActivity, during: schedule)
         } catch {
