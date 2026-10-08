@@ -68,19 +68,11 @@ final class TagReader: NSObject, NFCTagReaderSessionDelegate, @unchecked Sendabl
             finish(.failure(TagReaderError.unsupportedTag))
             return
         }
-        // The completion handler is Sendable, so it gets the session from self
-        // and does not capture the session or the tag.
-        session.connect(to: tag) { [weak self] error in
-            guard let self, let session = self.session else { return }
-            if let error {
-                session.invalidate(errorMessage: "Could not read the tag. Try again.")
-                self.finish(.failure(error))
-                return
-            }
-            session.alertMessage = "Tag read."
-            session.invalidate()
-            self.finish(.success(id))
-        }
+        // The ID is known when the tag is detected, so close the sheet at once.
+        // A connect to the tag first only makes the sheet stay longer.
+        session.alertMessage = "Tag read."
+        session.invalidate()
+        finish(.success(id))
     }
 
     private func finish(_ result: Result<String, Error>) {
