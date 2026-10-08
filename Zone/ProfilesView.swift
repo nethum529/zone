@@ -2,36 +2,37 @@ import FamilyControls
 import SwiftUI
 
 // The list of profiles. Opens from Settings as a sheet.
+// Tap a name to use that profile. Tap the caret to edit it.
 struct ProfilesView: View {
     @Environment(ZoneStore.self) private var store
     @Environment(\.dismiss) private var dismiss
     @State private var path: [ZoneProfile.ID] = []
     @State private var adding = false
     @State private var newName = ""
+    @State private var deleting: ZoneProfile?
 
     var body: some View {
         NavigationStack(path: $path) {
             VStack(spacing: 0) {
                 ZoneTitle("Profiles")
-                Form {
-                    Section {
-                        ForEach(store.profiles.all) { profile in
-                            Button { path.append(profile.id) } label: {
-                                HStack {
-                                    Text(profile.name)
-                                        .foregroundStyle(Color.zoneInk)
-                                        .lineLimit(1)
-                                    Spacer()
-                                    Text(appsText(profile.selection))
-                                        .foregroundStyle(Color.zoneMute)
-                                    ZoneCaret()
+                // A plain List only for swipe to delete. It draws no cards or lines.
+                List {
+                    ForEach(store.profiles.all) { profile in
+                        profileRow(profile)
+                            .listRowInsets(EdgeInsets(top: 0, leading: 24, bottom: 0, trailing: 24))
+                            .listRowBackground(Color.zoneBackground)
+                            .listRowSeparator(.hidden)
+                            .swipeActions {
+                                if store.canDeleteProfile(profile.id) {
+                                    Button("Delete") { deleting = profile }
+                                        .tint(.red)
                                 }
                             }
-                        }
                     }
-                    .listRowBackground(Color.zoneCard)
                 }
+                .listStyle(.plain)
                 .scrollContentBackground(.hidden)
+                .contentMargins(.top, 24, for: .scrollContent)
             }
             .safeAreaInset(edge: .bottom) {
                 Button("Add profile") {
@@ -43,9 +44,7 @@ struct ProfilesView: View {
             }
             .profilePage()
             .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Done") { dismiss() }
-                }
+                ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
             }
             .navigationDestination(for: ZoneProfile.ID.self) { ProfileView(id: $0) }
             .alert("New profile", isPresented: $adding) {
@@ -56,9 +55,58 @@ struct ProfilesView: View {
                 }
                 .disabled(isBlank(newName))
             }
+            .confirmationDialog(
+                "Delete \(deleting?.name ?? "")?",
+                isPresented: Binding { deleting != nil } set: { if !$0 { deleting = nil } },
+                titleVisibility: .visible,
+                presenting: deleting
+            ) { profile in
+                Button("Delete profile", role: .destructive) {
+                    withAnimation(.smooth(duration: 0.3)) { store.profiles.delete(profile.id) }
+                }
+                Button("Cancel", role: .cancel) {}
+            }
         }
-        .tint(Color.zoneInk)
+        .tint(Color.zoneBone)
+        .foregroundStyle(Color.zoneInk)
+        .fontDesign(.rounded)
+        .preferredColorScheme(.dark)
         .presentationBackground(Color.zoneBackground)
+    }
+
+    private func profileRow(_ profile: ZoneProfile) -> some View {
+        let current = store.profiles.currentID == profile.id
+        // With one profile there is nothing to choose, so no check.
+        let checked = current && store.profiles.all.count > 1
+        return HStack(spacing: 0) {
+            Button {
+                withAnimation(.smooth(duration: 0.3)) { store.profiles.choose(profile.id) }
+            } label: {
+                HStack(spacing: 6) {
+                    Text(profile.name)
+                        .lineLimit(1)
+                    Spacer()
+                    Image("check")
+                        .resizable()
+                        .frame(width: 14, height: 14)
+                        .opacity(checked ? 1 : 0)
+                }
+                .frame(height: 52)
+                .contentShape(.rect)
+            }
+            // While locked, the profile in use cannot change.
+            .disabled(store.isLocked && !current)
+            .accessibilityAddTraits(current ? .isSelected : [])
+            Button { path.append(profile.id) } label: {
+                ZoneCaret()
+                    .padding(.trailing, -4)
+                    .frame(width: 44, height: 52, alignment: .trailing)
+                    .contentShape(.rect)
+            }
+            .accessibilityLabel("Edit \(profile.name)")
+        }
+        .font(.system(size: 17))
+        .buttonStyle(ZoneRowStyle())
     }
 }
 
@@ -80,28 +128,31 @@ private struct ProfileView: View {
         let inUse = store.isLocked && store.profiles.currentID == id
         VStack(spacing: 0) {
             ZoneTitle(profile?.name ?? "")
-            Form {
-                Section {
+            ScrollView {
+                VStack(spacing: 0) {
                     Button { picking = true } label: {
-                        ZoneRow("prohibit-fill", "Blocked apps", value: appsText(profile?.selection ?? FamilyActivitySelection()))
+                        ZoneRow("Blocked apps", value: appsText(profile?.selection ?? FamilyActivitySelection()))
                     }
                     .disabled(inUse)
-                }
-                .listRowBackground(Color.zoneCard)
-                Section {
-                    Button("Rename") {
-                        newName = profile?.name ?? ""
-                        renaming = true
+                    VStack(spacing: 0) {
+                        Button {
+                            newName = profile?.name ?? ""
+                            renaming = true
+                        } label: {
+                            actionRow("Rename")
+                        }
+                        Button { confirmingDelete = true } label: {
+                            actionRow("Delete profile")
+                        }
+                        .disabled(!store.canDeleteProfile(id))
                     }
-                    .foregroundStyle(Color.zoneInk)
-                    // The app sets ink on all text, so set the destructive red again here.
-                    Button("Delete profile", role: .destructive) { confirmingDelete = true }
-                        .foregroundStyle(.red)
-                        .disabled(inUse || !store.profiles.canDelete)
+                    .padding(.top, 24)
                 }
-                .listRowBackground(Color.zoneCard)
+                .font(.system(size: 17))
+                .buttonStyle(ZoneRowStyle())
+                .padding(.horizontal, 24)
+                .padding(.top, 24)
             }
-            .scrollContentBackground(.hidden)
         }
         .profilePage()
         .onAppear { last = store.profiles.profile(id) }
@@ -124,6 +175,14 @@ private struct ProfileView: View {
         }
     }
 
+    // A plain action row, like Remove backup tag in Zone tags.
+    private func actionRow(_ title: String) -> some View {
+        Text(title)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(height: 52)
+            .contentShape(.rect)
+    }
+
     private var selection: Binding<FamilyActivitySelection> {
         Binding {
             store.profiles.profile(id)?.selection ?? FamilyActivitySelection()
@@ -133,17 +192,24 @@ private struct ProfileView: View {
     }
 }
 
+private extension ZoneStore {
+    // Keep at least one profile, and never delete the one that is locked now.
+    func canDeleteProfile(_ id: ZoneProfile.ID) -> Bool {
+        profiles.canDelete && !(isLocked && profiles.currentID == id)
+    }
+}
+
 private extension View {
-    // Both pages put the title in the same place, under an empty bar.
+    // Both pages put the title in the same place, under a plain bar like Zone tags.
     func profilePage() -> some View {
         frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             .background(Color.zoneBackground)
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(.hidden, for: .navigationBar)
+            .toolbarBackground(Color.zoneBackground, for: .navigationBar)
     }
 }
 
-// "None", "1 app" or "3 apps", the same as the old Blocked apps row.
+// "None", "1 app" or "3 apps".
 private func appsText(_ selection: FamilyActivitySelection) -> String {
     let count = selection.applicationTokens.count
         + selection.categoryTokens.count

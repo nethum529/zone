@@ -13,13 +13,13 @@ struct SettingsView: View {
             ScrollView {
                 VStack(spacing: 0) {
                     Button { showingProfiles = true } label: {
-                        row("Profiles", value: store.profiles.current.name) { ZoneCaret() }
+                        ZoneRow("Profiles", value: store.profiles.current.name)
                     }
                     Button { showingTags = true } label: {
-                        row("Zone tags", value: tagSummary) { ZoneCaret() }
+                        ZoneRow("Zone tags", value: tagSummary)
                     }
                     Button { showingSchedules = true } label: {
-                        row("Schedules", value: scheduleText) { ZoneCaret() }
+                        ZoneRow("Schedules", value: scheduleText)
                     }
                     .padding(.top, 24)
                     VStack(spacing: 0) {
@@ -30,7 +30,7 @@ struct SettingsView: View {
                                 ForEach(ZoneStore.relockChoices, id: \.self) { Text("\($0) min") }
                             }
                         } label: {
-                            row("Relock after", value: "\(store.relockMinutes) min") {
+                            ZoneRow("Relock after", value: "\(store.relockMinutes) min") {
                                 Image("caret-up-down")
                                     .resizable()
                                     .frame(width: 14, height: 14)
@@ -41,7 +41,7 @@ struct SettingsView: View {
                     .disabled(store.relockAt != nil)
                     .padding(.top, 24)
                     EmergencyUnlockSettingsRow { remaining in
-                        row("Emergency unlock", value: "\(remaining)") { ZoneCaret() }
+                        ZoneRow("Emergency unlock", value: "\(remaining)")
                     }
                 }
                 .buttonStyle(ZoneRowStyle())
@@ -65,26 +65,6 @@ struct SettingsView: View {
     private var scheduleText: String {
         let count = store.scheduleStore.schedules.count
         return count == 0 ? "None" : "\(count) schedule\(count == 1 ? "" : "s")"
-    }
-
-    // The same label and value row as on Home.
-    private func row(_ label: String, value: String, @ViewBuilder caret: () -> some View) -> some View {
-        HStack(spacing: 6) {
-            Text(label)
-                .foregroundStyle(Color.zoneMute)
-                .layoutPriority(1)
-            Spacer()
-            Text(value)
-                .fontWeight(.semibold)
-                .lineLimit(1)
-                .monospacedDigit()
-            caret()
-                // The caret ink ends 4 pt inside its frame. Line it up with the switch edge.
-                .padding(.trailing, -4)
-        }
-        .font(.system(size: 17))
-        .frame(height: 52)
-        .contentShape(.rect)
     }
 }
 
