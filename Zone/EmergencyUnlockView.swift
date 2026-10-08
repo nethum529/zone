@@ -15,7 +15,6 @@ struct EmergencyUnlockSettingsRow<Label: View>: View {
                 Button { isPresented = true } label: {
                     label(EmergencyUnlockAllowance(defaults: ZoneLock.defaults).remaining(at: .now))
                 }
-                .padding(.top, 24)
             }
         }
         .sheet(isPresented: $isPresented) {

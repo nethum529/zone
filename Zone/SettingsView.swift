@@ -12,25 +12,29 @@ struct SettingsView: View {
             ZoneTitle("Settings")
             ScrollView {
                 VStack(spacing: 0) {
-                    Button { showingProfiles = true } label: {
-                        ZoneRow("Profiles", value: store.profiles.current.name)
-                    }
                     Button { showingTags = true } label: {
-                        ZoneRow("Zone tags", value: tagSummary)
+                        row("Zone tags", value: tagSummary)
+                    }
+                    Button { showingProfiles = true } label: {
+                        row("Profiles", value: store.profiles.current.name)
                     }
                     Button { showingSchedules = true } label: {
-                        ZoneRow("Schedules", value: scheduleText)
+                        row("Schedules", value: scheduleText)
                     }
-                    .padding(.top, 24)
                     VStack(spacing: 0) {
-                        Toggle("Super Zone", isOn: $store.superZone)
-                            .toggleStyle(ZoneToggleStyle())
+                        Toggle(isOn: $store.superZone) {
+                            Text("Super Zone")
+                                .font(.system(size: 20, weight: .medium))
+                                .foregroundStyle(Color.zoneInk)
+                        }
+                        .toggleStyle(ZoneToggleStyle())
+                        .frame(height: 64)
                         Menu {
                             Picker("Relock after", selection: $store.relockMinutes) {
                                 ForEach(ZoneStore.relockChoices, id: \.self) { Text("\($0) min") }
                             }
                         } label: {
-                            ZoneRow("Relock after", value: "\(store.relockMinutes) min") {
+                            row("Relock after", value: "\(store.relockMinutes) min") {
                                 Image("caret-up-down")
                                     .resizable()
                                     .frame(width: 14, height: 14)
@@ -39,9 +43,8 @@ struct SettingsView: View {
                         }
                     }
                     .disabled(store.relockAt != nil)
-                    .padding(.top, 24)
                     EmergencyUnlockSettingsRow { remaining in
-                        ZoneRow("Emergency unlock", value: "\(remaining)")
+                        row("Emergency unlock", value: "\(remaining)")
                     }
                 }
                 .buttonStyle(ZoneRowStyle())
@@ -56,15 +59,40 @@ struct SettingsView: View {
         .sheet(isPresented: $showingSchedules) { SchedulesView() }
     }
 
+    // One list, one row: label and value in ink at one size, no gaps or lines.
+    private func row<Trailing: View>(_ label: String, value: String, @ViewBuilder trailing: () -> Trailing) -> some View {
+        HStack(spacing: 6) {
+            Text(label)
+                .fontWeight(.medium)
+                .layoutPriority(1)
+            Spacer()
+            Text(value)
+                .fontWeight(.semibold)
+                .lineLimit(1)
+                .monospacedDigit()
+            trailing()
+                // The caret ink ends 4 pt inside its frame. Line it up with the switch edge.
+                .padding(.trailing, -4)
+        }
+        .font(.system(size: 20))
+        .foregroundStyle(Color.zoneInk)
+        .frame(height: 64)
+        .contentShape(.rect)
+    }
+
+    private func row(_ label: String, value: String) -> some View {
+        row(label, value: value) { ZoneCaret() }
+    }
+
     private var tagSummary: String {
-        if store.tags.backupID != nil { "2 tags" }
-        else if store.tags.mainID != nil { "1 tag" }
+        if store.tags.backupID != nil { "2" }
+        else if store.tags.mainID != nil { "1" }
         else { "Register" }
     }
 
     private var scheduleText: String {
         let count = store.scheduleStore.schedules.count
-        return count == 0 ? "None" : "\(count) schedule\(count == 1 ? "" : "s")"
+        return count == 0 ? "None" : "\(count)"
     }
 }
 
