@@ -77,11 +77,12 @@ struct ZoneStatusView: View {
         }
     }
 
+    // The mark shows when you are in the Zone, like in the circular widget.
     private var small: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text(status)
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(entry.isZoned ? Color.zoneInk : Color.zoneMute)
+            if entry.isZoned {
+                ZoneMark(size: 22, color: .zoneBone)
+            }
             Spacer(minLength: 0)
             entry.todayText
                 .font(.system(size: 34, weight: .semibold))
