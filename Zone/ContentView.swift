@@ -85,15 +85,21 @@ final class TagScanner {
     var errorMessage: String?
     private let reader = TagReader()
     private var isScanning = false
+    #if DEBUG && targetEnvironment(simulator)
+    let simulatedScan = SimulatedTagScan()
+    #endif
 
     // Returns nil when the scan failed or the user closed the scan sheet.
-    func scan() async -> String? {
+    func scan(prompt: String = "Hold your phone near your Zone tag.") async -> String? {
         // A second tap while a scan runs does nothing.
         guard !isScanning else { return nil }
         isScanning = true
         defer { isScanning = false }
+        #if DEBUG && targetEnvironment(simulator)
+        return await simulatedScan.scan(prompt: prompt)
+        #else
         do {
-            return try await reader.scan(prompt: "Hold your phone near your Zone tag.")
+            return try await reader.scan(prompt: prompt)
         } catch {
             // The user closed the scan sheet, or it closed by itself. The sheet already showed this.
             if let nfcError = error as? NFCReaderError,
@@ -103,6 +109,7 @@ final class TagScanner {
             errorMessage = error.localizedDescription
             return nil
         }
+        #endif
     }
 }
 
@@ -113,5 +120,8 @@ extension View {
         } message: {
             Text(scanner.errorMessage ?? "")
         }
+        #if DEBUG && targetEnvironment(simulator)
+        .modifier(SimulatedTagScanPresenter(scan: scanner.simulatedScan))
+        #endif
     }
 }
