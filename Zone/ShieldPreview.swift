@@ -9,8 +9,6 @@ import UIKit
 // icon, 15 pt gap, title (large title, bold), subtitle (body), and a 167 x 50 capsule button
 // 48 pt above the bottom safe area. The text block sits in the middle of the space above the button.
 struct ShieldPreview: View {
-    let zonedSince: Date?
-
     var body: some View {
         ZStack {
             Color(uiColor: ShieldLook.background)
@@ -41,7 +39,7 @@ struct ShieldPreview: View {
                 .font(.largeTitle.bold())
                 .foregroundStyle(Color(uiColor: ShieldLook.ink))
                 .minimumScaleFactor(0.5)
-            Text(ShieldLook.subtitle(zonedSince: zonedSince, now: .now))
+            Text(ShieldLook.subtitle)
                 .font(.body)
                 .foregroundStyle(Color(uiColor: ShieldLook.mute))
         }

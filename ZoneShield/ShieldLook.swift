@@ -19,17 +19,8 @@ enum ShieldLook {
     static let title = "In the Zone"
     static let button = "Close"
 
-    // "1h 42m in. Scan tag to leave". The second part uses the words of the Home button.
-    static func subtitle(zonedSince: Date?, now: Date) -> String {
-        let leave = "Scan tag to leave"
-        guard let zonedSince else { return leave }
-        let time = now.timeIntervalSince(zonedSince)
-        guard time >= 60 else { return leave }
-        let text = Duration.seconds(time).formatted(
-            .units(allowed: [.hours, .minutes], width: .narrow, fractionalPart: .hide(rounded: .down))
-        )
-        return "\(text) in. \(leave)"
-    }
+    // The same words as the Home button.
+    static let subtitle = "Scan tag to leave"
 
     // The bone Zone mark on a clear background. ShieldIcon.png is a 3x image, so it shows at
     // 72 pt on every device: the mark from the app icon, 156 px wide, centred in 216 px.
