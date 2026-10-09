@@ -229,7 +229,7 @@ private extension View {
 }
 
 // "None", "1 app" or "3 apps".
-private func appsText(_ selection: FamilyActivitySelection) -> String {
+func appsText(_ selection: FamilyActivitySelection) -> String {
     let count = selection.applicationTokens.count
         + selection.categoryTokens.count
         + selection.webDomainTokens.count
