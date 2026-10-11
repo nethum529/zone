@@ -105,7 +105,7 @@ struct SchedulesView: View {
     private var setupMessage: String? {
         let enabled = visible.filter(\.isEnabled)
         guard !enabled.isEmpty else { return nil }
-        if zone.registeredTagID == nil { return "Register your tag on Home to use schedules." }
+        if !zone.hasTag { return "Register your tag on Home to use schedules." }
         let profiles = enabled.compactMap { $0.profile(in: zone.profiles) }
         if profiles.count != enabled.count { return "Choose a profile for each schedule." }
         if profiles.contains(where: { !$0.blocksSomething }) { return "Choose blocked apps in Profiles to use schedules." }

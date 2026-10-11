@@ -67,9 +67,7 @@ struct SettingsView: View {
     }
 
     private var tagSummary: String {
-        if store.tags.backupID != nil { "2" }
-        else if store.tags.mainID != nil { "1" }
-        else { "Register" }
+        store.tags.all.isEmpty ? "Register" : "\(store.tags.all.count)"
     }
 
     private var scheduleText: String {

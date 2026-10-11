@@ -11,7 +11,7 @@ final class ZoneStore {
     let scheduleStore: ZoneScheduleStore
     private(set) var authorization: AuthorizationStatus
     let tags = ZoneTags()
-    var registeredTagID: String? { tags.mainID }
+    var hasTag: Bool { !tags.all.isEmpty }
     private(set) var zonedSince: Date?
     // In Super Zone, the time when Zone locks again after the user leaves.
     private(set) var relockAt: Date?
@@ -89,8 +89,8 @@ final class ZoneStore {
         authorization = AuthorizationCenter.shared.authorizationStatus
     }
 
-    func registerTag(_ id: String) throws {
-        try tags.setMain(id)
+    func registerTag(_ id: String, name: String?) throws {
+        try tags.add(id, name: name)
     }
 
     func isRegisteredTag(_ id: String) -> Bool {

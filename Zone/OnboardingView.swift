@@ -8,6 +8,8 @@ struct OnboardingView: View {
     @State private var step = Step.profile
     @State private var scanner = TagScanner()
     @State private var picking = false
+    // The name from the name step. The scan saves the tag with it.
+    @State private var tagName: String?
 
     private enum Step { case profile, tagName, scan }
 
@@ -20,7 +22,7 @@ struct OnboardingView: View {
                 } else {
                     switch step {
                     case .profile: profile
-                    case .tagName: TagNameForm(tags: store.tags, backup: false) { go(to: .scan) }
+                    case .tagName: TagNameForm(name: tagName) { tagName = $0 } done: { go(to: .scan) }
                     case .scan: scan
                     }
                 }
@@ -69,7 +71,7 @@ struct OnboardingView: View {
     private func register() async {
         guard let id = await scanner.scan() else { return }
         do {
-            try store.registerTag(id)
+            try store.registerTag(id, name: tagName)
             store.enterZone()
         } catch {
             scanner.errorMessage = error.localizedDescription

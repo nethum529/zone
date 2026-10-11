@@ -17,7 +17,9 @@ enum ZoneLock {
         // Before profiles, the one selection. Kept so the first profile can be made from it.
         static let selection = "selection"
         static let profiles = "profiles"
+        // Before the tag list, the one main tag. Kept so the list can be made from it.
         static let tagID = "tagID"
+        static let tags = "tags"
         static let zonedSince = "zonedSince"
         static let superZone = "superZone"
         static let relockAt = "relockAt"

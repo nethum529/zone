@@ -11,144 +11,134 @@ struct ZoneTagsTests {
         try body(ZoneTags(defaults: defaults), defaults)
     }
 
-    @Test func existingMainTagIsPreserved() throws {
+    @Test func existingMainAndBackupTagsArePreserved() throws {
         try withTags { _, defaults in
             defaults.set("existing", forKey: ZoneLock.Keys.tagID)
+            defaults.set("Desk", forKey: "mainTagName")
+            defaults.set("backup", forKey: "backupTagID")
             let tags = ZoneTags(defaults: defaults)
-            #expect(tags.mainID == "existing")
-            #expect(tags.backupID == nil)
+            #expect(tags.all == [ZoneTag(id: "existing", name: "Desk"), ZoneTag(id: "backup")])
             #expect(tags.contains("existing"))
-            try tags.setBackup("backup")
-            #expect(tags.mainID == "existing")
+            #expect(tags.contains("backup"))
+            try tags.add("new")
+            let reloaded = ZoneTags(defaults: defaults)
+            #expect(reloaded.all.map(\.id) == ["existing", "backup", "new"])
+            #expect(reloaded.tag("existing")?.name == "Desk")
+            #expect(defaults.string(forKey: ZoneLock.Keys.tagID) == nil)
         }
     }
 
-    @Test func eitherSavedTagIsAcceptedAfterReload() throws {
+    @Test func everySavedTagIsAcceptedAfterReload() throws {
         try withTags { tags, defaults in
-            try tags.setMain("main")
-            try tags.setBackup("backup")
+            try tags.add("one")
+            try tags.add("two")
+            try tags.add("three", name: "Keychain")
             let reloaded = ZoneTags(defaults: defaults)
-            #expect(reloaded.mainID == "main")
-            #expect(reloaded.backupID == "backup")
-            #expect(reloaded.contains("main"))
-            #expect(reloaded.contains("backup"))
+            #expect(reloaded.contains("one"))
+            #expect(reloaded.contains("two"))
+            #expect(reloaded.contains("three"))
+            #expect(reloaded.tag("three")?.name == "Keychain")
             #expect(!reloaded.contains("unknown"))
             #expect(!reloaded.contains(""))
         }
     }
 
-    @Test func replacementRevokesOnlyTheOldBackup() throws {
+    @Test func replacementRevokesOnlyTheOldTag() throws {
         try withTags { tags, defaults in
-            try tags.setMain("main")
-            try tags.setBackup("old")
-            try tags.setBackup("new")
+            try tags.add("main")
+            try tags.add("old", name: "Desk")
+            try tags.replace("old", with: "new")
             let reloaded = ZoneTags(defaults: defaults)
             #expect(reloaded.contains("main"))
             #expect(reloaded.contains("new"))
             #expect(!reloaded.contains("old"))
+            #expect(reloaded.tag("new")?.name == "Desk")
         }
     }
 
-    @Test func removalPersistsAndPreservesMainTag() throws {
+    @Test func deletePersistsAndKeepsTheLastTag() throws {
         try withTags { tags, defaults in
-            try tags.setMain("main")
-            try tags.setBackup("backup")
-            try tags.removeBackup()
+            try tags.add("main")
+            try tags.add("backup")
+            try tags.delete("main")
             let reloaded = ZoneTags(defaults: defaults)
-            #expect(reloaded.backupID == nil)
-            #expect(!reloaded.contains("backup"))
-            #expect(reloaded.contains("main"))
+            #expect(!reloaded.contains("main"))
+            #expect(reloaded.contains("backup"))
+            #expect(throws: ZoneTagError.lastTag) { try reloaded.delete("backup") }
+            #expect(reloaded.contains("backup"))
         }
     }
 
     @Test func tagsMustBeDifferent() throws {
         try withTags { tags, _ in
-            try tags.setMain("main")
-            #expect(throws: ZoneTagError.alreadyRegistered) { try tags.setBackup("main") }
-            #expect(tags.backupID == nil)
-            try tags.setBackup("backup")
-            #expect(throws: ZoneTagError.alreadyRegistered) { try tags.setMain("backup") }
-            #expect(throws: ZoneTagError.alreadyRegistered) { try tags.setBackup("backup") }
-            #expect(throws: ZoneTagError.alreadyRegistered) { try tags.setMain("main") }
-            #expect(tags.mainID == "main")
-            #expect(tags.backupID == "backup")
-        }
-    }
-
-    @Test func backupNeedsAMainTag() throws {
-        try withTags { tags, _ in
-            #expect(throws: ZoneTagError.mainTagRequired) { try tags.setBackup("backup") }
-            #expect(tags.backupID == nil)
-            #expect(throws: ZoneTagError.emptyTag) { try tags.setMain("") }
-            #expect(tags.mainID == nil)
+            try tags.add("main")
+            #expect(throws: ZoneTagError.alreadyRegistered) { try tags.add("main") }
+            try tags.add("backup")
+            #expect(throws: ZoneTagError.alreadyRegistered) { try tags.replace("main", with: "backup") }
+            #expect(throws: ZoneTagError.emptyTag) { try tags.add("") }
+            #expect(tags.all.map(\.id) == ["main", "backup"])
         }
     }
 
     @Test(arguments: [ZoneLock.Keys.zonedSince, ZoneLock.Keys.relockAt])
     func protectedChangesRejectMissingOrUnknownProof(lockKey: String) throws {
         try withTags { tags, defaults in
-            try tags.setMain("main")
+            try tags.add("main")
             let lockDate = Date.now
             defaults.set(lockDate, forKey: lockKey)
-            #expect(throws: ZoneTagError.verificationRequired) { try tags.setBackup("backup") }
-            #expect(throws: ZoneTagError.verificationRequired) { try tags.setMain("new") }
+            #expect(throws: ZoneTagError.verificationRequired) { try tags.add("backup") }
+            #expect(throws: ZoneTagError.verificationRequired) { try tags.replace("main", with: "new") }
             #expect(throws: ZoneTagError.verificationRequired) {
-                try tags.setBackup("backup", verifiedBy: "unknown")
+                try tags.add("backup", verifiedBy: "unknown")
             }
-            try tags.setBackup("backup", verifiedBy: "main")
-            #expect(throws: ZoneTagError.verificationRequired) { try tags.removeBackup() }
-            #expect(throws: ZoneTagError.verificationRequired) { try tags.setBackup("new") }
+            try tags.add("backup", verifiedBy: "main")
+            #expect(throws: ZoneTagError.verificationRequired) { try tags.delete("backup") }
             #expect(throws: ZoneTagError.verificationRequired) {
-                try tags.removeBackup(verifiedBy: "unknown")
+                try tags.delete("backup", verifiedBy: "unknown")
             }
-            #expect(tags.mainID == "main")
-            #expect(tags.backupID == "backup")
+            #expect(tags.all.map(\.id) == ["main", "backup"])
             #expect(defaults.object(forKey: lockKey) as? Date == lockDate)
         }
     }
 
     @Test(arguments: [ZoneLock.Keys.zonedSince, ZoneLock.Keys.relockAt], ["main", "backup"])
-    func eitherTagCanApproveEachProtectedChange(lockKey: String, savedID: String) throws {
+    func anyTagCanApproveEachProtectedChange(lockKey: String, savedID: String) throws {
         try withTags { tags, defaults in
-            try tags.setMain("main")
-            try tags.setBackup("backup")
+            try tags.add("main")
+            try tags.add("backup")
             let lockDate = Date.now
             defaults.set(lockDate, forKey: lockKey)
-            try tags.setBackup("new-backup", verifiedBy: savedID)
-            #expect(tags.backupID == "new-backup")
-            #expect(!tags.contains("backup"))
-            try tags.setBackup("backup", verifiedBy: "main")
-            try tags.setMain("new-main", verifiedBy: savedID)
-            #expect(tags.mainID == "new-main")
-            #expect(!tags.contains("main"))
-            try tags.setMain("main", verifiedBy: "backup")
-            try tags.removeBackup(verifiedBy: savedID)
-            #expect(tags.backupID == nil)
-            #expect(tags.contains("main"))
+            try tags.add("third", verifiedBy: savedID)
+            try tags.replace("third", with: "new", verifiedBy: savedID)
+            #expect(tags.contains("new"))
+            #expect(!tags.contains("third"))
+            try tags.delete("new", verifiedBy: savedID)
+            #expect(!tags.contains("new"))
+            #expect(tags.all.map(\.id) == ["main", "backup"])
             #expect(defaults.object(forKey: lockKey) as? Date == lockDate)
         }
     }
 
     @Test func lockStartingDuringChangeStillNeedsVerification() throws {
         try withTags { tags, defaults in
-            try tags.setMain("main")
+            try tags.add("main")
             #expect(!tags.requiresVerification)
             defaults.set(Date.now, forKey: ZoneLock.Keys.zonedSince)
-            #expect(throws: ZoneTagError.verificationRequired) { try tags.setBackup("backup") }
-            #expect(tags.backupID == nil)
+            #expect(throws: ZoneTagError.verificationRequired) { try tags.add("backup") }
+            #expect(!tags.contains("backup"))
         }
     }
 
     @Test func replacedTagCannotApproveLaterChanges() throws {
         try withTags { tags, defaults in
-            try tags.setMain("main")
-            try tags.setBackup("old")
+            try tags.add("main")
+            try tags.add("old")
             defaults.set(Date.now, forKey: ZoneLock.Keys.zonedSince)
-            try tags.setBackup("new", verifiedBy: "old")
+            try tags.replace("old", with: "new", verifiedBy: "old")
             #expect(throws: ZoneTagError.verificationRequired) {
-                try tags.removeBackup(verifiedBy: "old")
+                try tags.delete("new", verifiedBy: "old")
             }
-            #expect(tags.backupID == "new")
+            #expect(tags.contains("new"))
         }
     }
 }
