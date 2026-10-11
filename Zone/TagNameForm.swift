@@ -17,7 +17,7 @@ struct TagNameForm: View {
         VStack(alignment: .leading, spacing: 12) {
             ZoneTitle("Name this tag")
             Text("Where does it live? For example Desk or Keychain.")
-                .font(.body)
+                .font(.zone(.body))
                 .foregroundStyle(Color.zoneMute)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.horizontal, 24)
@@ -32,7 +32,7 @@ struct TagNameForm: View {
                     .onSubmit(saveAndClose)
                     .accessibilityLabel("Tag name")
             }
-            .font(.system(size: 17))
+            .font(.zone(size: 17))
             .frame(height: 52)
             .contentShape(.rect)
             .onTapGesture { editing = true }

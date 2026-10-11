@@ -53,7 +53,7 @@ struct ScheduleEditorView: View {
                         editRow(schedule.crossesMidnight ? "End next day" : "End",
                                 value: ZoneSchedule.time(schedule.endMinute).formatted(date: .omitted, time: .shortened), field: .end)
                         Toggle(isOn: $schedule.isEnabled) {
-                            Text("Enabled").font(.body)
+                            Text("Enabled").font(.zone(.body))
                         }
                         .toggleStyle(ZoneToggleStyle())
                         .disabled(isRunning)
@@ -79,7 +79,7 @@ struct ScheduleEditorView: View {
                             .padding(.top, 24)
                         }
                     }
-                    .font(.body)
+                    .font(.zone(.body))
                     .buttonStyle(ZoneRowStyle())
                     .padding(.horizontal, 24)
                     .padding(.top, 24)
@@ -140,7 +140,7 @@ struct ScheduleEditorView: View {
 
     private func note(_ text: String) -> some View {
         Text(text)
-            .font(.footnote)
+            .font(.zone(.footnote))
             .foregroundStyle(Color.zoneMute)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.top, 16)

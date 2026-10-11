@@ -95,7 +95,7 @@ struct OnboardingView: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.horizontal, 24)
             rows()
-                .font(.system(size: 17))
+                .font(.zone(size: 17))
                 .padding(.horizontal, 24)
                 .padding(.top, 12)
             Spacer(minLength: 24)

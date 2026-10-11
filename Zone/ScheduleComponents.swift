@@ -23,7 +23,7 @@ struct ScheduleValueRow: View {
             }
             ZoneCaret().padding(.trailing, -4)
         }
-        .font(.body)
+        .font(.zone(.body))
         .frame(minHeight: 52)
         .padding(.vertical, typeSize.isAccessibilitySize ? 8 : 0)
         .contentShape(.rect)
@@ -36,7 +36,7 @@ extension View {
             .background(Color.zoneBackground)
             .toolbarBackground(.hidden, for: .navigationBar)
             .navigationBarTitleDisplayMode(.inline)
-            .fontDesign(.rounded)
+            .font(.zone(.body))
             .foregroundStyle(Color.zoneInk)
             .tint(Color.zoneBone)
             .preferredColorScheme(.dark)

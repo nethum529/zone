@@ -21,6 +21,33 @@ extension Color {
     }
 }
 
+// Manrope is the Zone font. Zone/Fonts has the files and their license.
+// The shield is drawn by iOS, so it keeps the system font.
+extension Font {
+    // A fixed size, as .system(size:) is.
+    static func zone(size: CGFloat, weight: Font.Weight = .regular) -> Font {
+        .custom("Manrope-Regular", fixedSize: size).weight(weight)
+    }
+
+    // Grows with Dynamic Type, as the text style does.
+    static func zone(_ style: Font.TextStyle, weight: Font.Weight? = nil) -> Font {
+        let (size, styleWeight): (CGFloat, Font.Weight) = switch style {
+        case .largeTitle: (34, .regular)
+        case .title: (28, .regular)
+        case .title2: (22, .regular)
+        case .title3: (20, .regular)
+        case .headline: (17, .semibold)
+        case .subheadline: (15, .regular)
+        case .callout: (16, .regular)
+        case .footnote: (13, .regular)
+        case .caption: (12, .regular)
+        case .caption2: (11, .regular)
+        default: (17, .regular)
+        }
+        return .custom("Manrope-Regular", size: size, relativeTo: style).weight(weight ?? styleWeight)
+    }
+}
+
 // "2h 15m", "5m" or "0m".
 func zoneTimeText(_ time: TimeInterval) -> String {
     Duration.seconds(time).formatted(.units(allowed: [.hours, .minutes], width: .narrow))
@@ -34,7 +61,7 @@ struct ZoneTitle: View {
 
     var body: some View {
         Text(text)
-            .font(.system(size: 34, weight: .bold))
+            .font(.zone(size: 34, weight: .bold))
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 24)
             .padding(.top, 8)
@@ -53,7 +80,7 @@ struct ZoneButtonStyle: ButtonStyle {
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.system(size: 17, weight: .semibold))
+            .font(.zone(size: 17, weight: .semibold))
             .foregroundStyle(Color.zoneBackground)
             .frame(maxWidth: .infinity)
             .frame(height: 56)
@@ -87,7 +114,7 @@ struct ZoneRow<Trailing: View>: View {
             if let note {
                 // A small grey note before the value, such as "Up 12%".
                 Text(note)
-                    .font(.system(size: 15))
+                    .font(.zone(size: 15))
                     .foregroundStyle(Color.zoneMute)
                     .monospacedDigit()
             }
@@ -99,7 +126,7 @@ struct ZoneRow<Trailing: View>: View {
                 // The caret ink ends 4 pt inside its frame. Line it up with the switch edge.
                 .padding(.trailing, -4)
         }
-        .font(.system(size: 17))
+        .font(.zone(size: 17))
         .frame(height: 52)
         .contentShape(.rect)
     }

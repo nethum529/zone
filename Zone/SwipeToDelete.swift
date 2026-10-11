@@ -71,7 +71,7 @@ private struct SwipeToDelete<ID: Hashable>: ViewModifier {
                             .onTapGesture { settle(open: false) }
                         Button(action: delete) {
                             Text("Delete")
-                                .font(.system(size: 17, weight: .semibold))
+                                .font(.zone(size: 17, weight: .semibold))
                                 .foregroundStyle(Color.zoneDelete)
                                 .padding(.leading, 16)
                                 .padding(.trailing, 24)
@@ -215,7 +215,7 @@ private struct UndoLine<Item: Identifiable & Equatable>: ViewModifier {
                         }
                         .buttonStyle(ZoneRowStyle())
                     }
-                    .font(.system(size: 15))
+                    .font(.zone(size: 15))
                     .frame(height: 44)
                     .padding(.horizontal, 24)
                     .background(Color.zoneBackground)

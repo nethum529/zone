@@ -39,7 +39,7 @@ struct SchedulesView: View {
                             }
                             if let setupMessage {
                                 Text(setupMessage)
-                                    .font(.footnote)
+                                    .font(.zone(.footnote))
                                     .foregroundStyle(Color.zoneMute)
                                     .frame(maxWidth: .infinity, alignment: .leading)
                                     .padding(.horizontal, 24)
@@ -116,19 +116,19 @@ struct SchedulesView: View {
         HStack(spacing: 16) {
             VStack(alignment: .leading, spacing: 8) {
                 Text(schedule.displayName)
-                    .font(.body.weight(.semibold))
+                    .font(.zone(.body, weight: .semibold))
                     .foregroundStyle(Color.zoneInk)
                 Text("\(schedule.daysText) · \(schedule.timeText)")
-                    .font(.subheadline)
+                    .font(.zone(.subheadline))
                     .foregroundStyle(Color.zoneMute)
             }
             .swipeLabel()
             Spacer(minLength: 0)
             HStack(spacing: 16) {
                 if store.runningID == schedule.id {
-                    Text("In the Zone").font(.subheadline).foregroundStyle(Color.zoneMute)
+                    Text("In the Zone").font(.zone(.subheadline)).foregroundStyle(Color.zoneMute)
                 } else if !schedule.isEnabled {
-                    Text("Off").font(.subheadline).foregroundStyle(Color.zoneMute)
+                    Text("Off").font(.zone(.subheadline)).foregroundStyle(Color.zoneMute)
                 }
                 ZoneCaret().padding(.trailing, -4)
             }

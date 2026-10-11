@@ -29,7 +29,7 @@ struct TagChangeView: View {
                 scanPage
             }
         }
-        .fontDesign(.rounded)
+        .font(.zone(.body))
         .tint(Color.zoneBone)
         .preferredColorScheme(.dark)
         .tagScanAlert(scanner)
@@ -46,7 +46,7 @@ struct TagChangeView: View {
                     VStack(alignment: .leading, spacing: 12) {
                         ZoneTitle(title)
                         Text(detail)
-                            .font(.body)
+                            .font(.zone(.body))
                             .foregroundStyle(Color.zoneMute)
                             .fixedSize(horizontal: false, vertical: true)
                             .padding(.horizontal, 24)

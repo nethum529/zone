@@ -66,7 +66,8 @@ struct HomeView: View {
 
     private func bigTime(_ time: TimeInterval) -> some View {
         let seconds = Int(time)
-        return VStack(alignment: .leading, spacing: -33) {
+        // Manrope lines are tall. This keeps the three lines 110 pt apart.
+        return VStack(alignment: .leading, spacing: -54) {
             bigLine("\(seconds / 3600)", unit: "h")
             bigLine(String(format: "%02d", seconds / 60 % 60), unit: "m")
             bigLine(String(format: "%02d", seconds % 60), unit: "s")
@@ -78,11 +79,11 @@ struct HomeView: View {
         HStack(alignment: .firstTextBaseline, spacing: 4) {
             Text(number)
                 .contentTransition(.numericText())
-                .font(.system(size: 120, weight: .bold))
+                .font(.zone(size: 120, weight: .bold))
                 .tracking(-5)
                 .monospacedDigit()
             Text(unit)
-                .font(.system(size: 38, weight: .semibold))
+                .font(.zone(size: 38, weight: .semibold))
                 .foregroundStyle(Color.zoneMute)
         }
         .lineLimit(1)
@@ -105,7 +106,7 @@ struct HomeView: View {
                 .fontWeight(.semibold)
                 .monospacedDigit()
         }
-        .font(.system(size: 17))
+        .font(.zone(size: 17))
         .frame(height: 30)
     }
 

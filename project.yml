@@ -26,6 +26,8 @@ targets:
       properties:
         UILaunchScreen:
           UIColorName: LaunchBackground
+        # Zone/Fonts holds the app font. Theme.swift uses it.
+        UIAppFonts: [manrope-regular.ttf, manrope-medium.ttf, manrope-semibold.ttf, manrope-bold.ttf]
     entitlements:
       path: Zone/Zone.entitlements
       properties:
@@ -122,6 +124,7 @@ targets:
       - ZoneWidget
       - WidgetShared
       - Zone/Theme.swift
+      - Zone/Fonts
       - Zone/ZoneStats.swift
       - Shared/ZoneSession.swift
     entitlements:
@@ -134,6 +137,7 @@ targets:
         CFBundleDisplayName: Zone
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        UIAppFonts: [manrope-regular.ttf, manrope-medium.ttf, manrope-semibold.ttf, manrope-bold.ttf]
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
     settings:

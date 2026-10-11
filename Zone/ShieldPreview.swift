@@ -24,7 +24,7 @@ struct ShieldPreview: View {
                     .padding(.bottom, 48)
             }
         }
-        // Apple's shield uses the plain system font, not the app's rounded one.
+        // Apple's shield uses the plain system font, not the app's Manrope.
         .fontDesign(.default)
         .preferredColorScheme(.dark)
     }

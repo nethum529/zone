@@ -60,7 +60,7 @@ struct ProfilesView: View {
         }
         .tint(Color.zoneBone)
         .foregroundStyle(Color.zoneInk)
-        .fontDesign(.rounded)
+        .font(.zone(.body))
         .preferredColorScheme(.dark)
         .presentationBackground(Color.zoneBackground)
     }
@@ -89,7 +89,7 @@ struct ProfilesView: View {
         }
         .accessibilityLabel(profile.name)
         .accessibilityAddTraits(current ? .isSelected : [])
-        .font(.system(size: 17))
+        .font(.zone(size: 17))
         .buttonStyle(ZoneRowStyle())
     }
 
@@ -170,7 +170,7 @@ private struct ProfileView: View {
                     }
                     .padding(.top, 24)
                 }
-                .font(.system(size: 17))
+                .font(.zone(size: 17))
                 .buttonStyle(ZoneRowStyle())
                 .padding(.horizontal, 24)
                 .padding(.top, 24)
@@ -236,7 +236,7 @@ private struct SitesView: View {
                                 .swipeLabel()
                             Spacer()
                         }
-                        .font(.system(size: 17))
+                        .font(.zone(size: 17))
                         .frame(height: 52)
                         .contentShape(.rect)
                         .padding(.horizontal, 24)

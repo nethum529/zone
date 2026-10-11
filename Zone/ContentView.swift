@@ -14,7 +14,7 @@ struct ContentView: View {
                 OnboardingView()
             }
         }
-        .fontDesign(.rounded)
+        .font(.zone(.body))
         .foregroundStyle(Color.zoneInk)
         .preferredColorScheme(.dark)
         .task { await store.watchAuthorization() }
@@ -49,7 +49,7 @@ private struct ZoneTabBar: View {
                     .accessibilityAddTraits(item == tab ? .isSelected : [])
             }
         }
-        .font(.system(size: 17, weight: .semibold))
+        .font(.zone(size: 17, weight: .semibold))
         .buttonStyle(.plain)
         .padding(.horizontal, 44)
         .background(Color.zoneBackground)
