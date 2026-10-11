@@ -150,14 +150,12 @@ private struct ProfileView: View {
                     .disabled(inUse)
                     VStack(spacing: 0) {
                         if !current {
-                            // While locked, the profile in use cannot change.
                             Button {
-                                withAnimation(.smooth(duration: 0.3)) { store.profiles.choose(id) }
+                                withAnimation(.smooth(duration: 0.3)) { store.chooseProfile(id) }
                                 dismiss()
                             } label: {
                                 actionRow("Use this profile")
                             }
-                            .disabled(store.isLocked)
                         }
                         Button {
                             newName = profile?.name ?? ""

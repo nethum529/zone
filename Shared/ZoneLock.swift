@@ -66,6 +66,25 @@ enum ZoneLock {
         defaults.removeObject(forKey: Keys.relockAt)
     }
 
+    @discardableResult
+    static func relockIfNeeded(
+        at now: Date = .now, tolerance: TimeInterval = 0,
+        in defaults: UserDefaults = ZoneLock.defaults
+    ) -> Bool {
+        withStateLock {
+            guard defaults.bool(forKey: Keys.superZone),
+                defaults.object(forKey: Keys.zonedSince) == nil,
+                let relockAt = defaults.object(forKey: Keys.relockAt) as? Date,
+                relockAt <= now || relockAt.timeIntervalSince(now) < tolerance
+            else { return false }
+            var state = ZoneScheduleRuntime.state(in: defaults)
+            state.run = nil
+            ZoneScheduleRuntime.save(state, in: defaults)
+            applyLock(at: now, in: defaults)
+            return true
+        }
+    }
+
     static func unlock(in defaults: UserDefaults = ZoneLock.defaults) {
         withStateLock {
             applyUnlock(at: .now, in: defaults)

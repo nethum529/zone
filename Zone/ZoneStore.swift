@@ -18,11 +18,25 @@ final class ZoneStore {
     // Finished sessions, oldest first.
     private(set) var sessions: [ZoneSession]
     var superZone: Bool {
-        didSet { defaults.set(superZone, forKey: Keys.superZone) }
+        didSet {
+            ZoneLock.withStateLock { defaults.set(superZone, forKey: Keys.superZone) }
+            if !superZone {
+                cancelRelock()
+                refresh()
+            }
+        }
     }
     static let relockChoices = [5, 10, 15, 30, 45, 60, 90, 120]
     var relockMinutes: Int {
-        didSet { defaults.set(relockMinutes, forKey: Keys.relockMinutes) }
+        didSet {
+            defaults.set(relockMinutes, forKey: Keys.relockMinutes)
+            if relockMinutes != oldValue, superZone, relockAt != nil {
+                // A new duration starts a new wait.
+                cancelRelock()
+                scheduleRelock()
+                refresh()
+            }
+        }
     }
     var profiles: ZoneProfiles {
         didSet { profiles.save(to: defaults) }
@@ -34,8 +48,7 @@ final class ZoneStore {
     }
 
     var isZoned: Bool { zonedSince != nil }
-    // In the Zone, the current profile cannot change.
-    // While Zone waits to lock again, a new choice is the profile the relock uses.
+    // The profile in use cannot lose apps or be deleted while in the Zone.
     var isLocked: Bool { isZoned }
     var hasBlockedItems: Bool { profiles.current.blocksSomething }
 
@@ -59,6 +72,9 @@ final class ZoneStore {
     // If the relock time passed and the extension did not lock, lock now.
     func refresh() {
         ZoneScheduleRuntime.reconcile(in: defaults)
+        if ZoneLock.relockIfNeeded(tolerance: 0, in: defaults) {
+            activityCenter.stopMonitoring([ZoneLock.relockActivity])
+        }
         scheduleStore.refresh()
         sessions = defaults.data(forKey: Keys.sessions)
             .flatMap { try? JSONDecoder().decode([ZoneSession].self, from: $0) } ?? []
@@ -66,9 +82,6 @@ final class ZoneStore {
         relockAt = defaults.object(forKey: Keys.relockAt) as? Date
         let saved = ZoneProfiles.load(from: defaults)
         if saved != profiles { profiles = saved }
-        if !isZoned, let relockAt, relockAt <= .now {
-            enterZone()
-        }
     }
 
     // iOS loads the Screen Time status a moment after launch.
@@ -102,6 +115,19 @@ final class ZoneStore {
         refresh()
     }
 
+    func chooseProfile(_ id: ZoneProfile.ID) {
+        ZoneLock.withStateLock {
+            var profiles = ZoneProfiles.load(from: defaults)
+            guard profiles.profile(id) != nil, profiles.currentID != id else { return }
+            profiles.choose(id)
+            profiles.save(to: defaults)
+            if let since = defaults.object(forKey: Keys.zonedSince) as? Date {
+                ZoneLock.applyLock(at: since, in: defaults)
+            }
+        }
+        refresh()
+    }
+
     // The finished sessions and the current one up to now.
     func sessions(at now: Date) -> [ZoneSession] {
         guard let zonedSince else { return sessions }
@@ -110,8 +136,7 @@ final class ZoneStore {
 
     func leaveZone(allowRelock: Bool = true) {
         guard isZoned else { return }
-        defaults.removeObject(forKey: Keys.relockAt)
-        activityCenter.stopMonitoring([ZoneLock.relockActivity])
+        cancelRelock()
         ZoneLock.unlock(in: defaults)
         if superZone && allowRelock {
             scheduleRelock()
@@ -133,6 +158,11 @@ final class ZoneStore {
         return true
     }
 
+    private func cancelRelock() {
+        ZoneLock.withStateLock { defaults.removeObject(forKey: Keys.relockAt) }
+        activityCenter.stopMonitoring([ZoneLock.relockActivity])
+    }
+
     // iOS does not monitor an activity shorter than 15 minutes, so the activity starts at the relock time.
     // The monitor extension locks when the activity starts. The end is a second chance.
     private func scheduleRelock() {
@@ -145,7 +175,9 @@ final class ZoneStore {
             repeats: false
         )
         let shouldMonitor = ZoneLock.withStateLock {
-            guard defaults.object(forKey: Keys.zonedSince) == nil else { return false }
+            guard defaults.bool(forKey: Keys.superZone),
+                defaults.object(forKey: Keys.zonedSince) == nil
+            else { return false }
             defaults.set(start, forKey: Keys.relockAt)
             return true
         }

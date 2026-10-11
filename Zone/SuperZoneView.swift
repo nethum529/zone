@@ -45,7 +45,6 @@ struct SuperZoneView: View {
                     .buttonStyle(ZoneRowStyle())
                     .disabled(!store.superZone)
                 }
-                .disabled(store.relockAt != nil)
                 .padding(.horizontal, 24)
                 .padding(.top, 24)
                 Spacer()
