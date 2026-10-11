@@ -68,11 +68,13 @@ struct ZoneButtonStyle: ButtonStyle {
 struct ZoneRow<Trailing: View>: View {
     let label: String
     let value: String
+    let note: String?
     let trailing: Trailing
 
-    init(_ label: String, value: String, @ViewBuilder trailing: () -> Trailing) {
+    init(_ label: String, value: String, note: String? = nil, @ViewBuilder trailing: () -> Trailing) {
         self.label = label
         self.value = value
+        self.note = note
         self.trailing = trailing()
     }
 
@@ -82,6 +84,13 @@ struct ZoneRow<Trailing: View>: View {
                 .foregroundStyle(Color.zoneMute)
                 .layoutPriority(1)
             Spacer()
+            if let note {
+                // A small grey note before the value, such as "Up 12%".
+                Text(note)
+                    .font(.system(size: 15))
+                    .foregroundStyle(Color.zoneMute)
+                    .monospacedDigit()
+            }
             Text(value)
                 .fontWeight(.semibold)
                 .lineLimit(1)
@@ -97,8 +106,8 @@ struct ZoneRow<Trailing: View>: View {
 }
 
 extension ZoneRow where Trailing == ZoneCaret {
-    init(_ label: String, value: String) {
-        self.init(label, value: value) { ZoneCaret() }
+    init(_ label: String, value: String, note: String? = nil) {
+        self.init(label, value: value, note: note) { ZoneCaret() }
     }
 }
 

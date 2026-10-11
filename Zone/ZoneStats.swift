@@ -55,9 +55,47 @@ struct ZoneStats {
         }
     }
 
+    // The last 7 days up to now, and the 7 days before them.
+    var lastWeek: TimeInterval { time(in: DateInterval(start: weekStart, end: max(weekStart, now))) }
+    var weekBefore: TimeInterval { time(in: DateInterval(start: calendar.date(byAdding: .day, value: -7, to: weekStart)!, end: weekStart)) }
+
+    // Sessions with time in the last 7 days.
+    var weekSessions: [ZoneSession] { sessions.filter { $0.end > weekStart } }
+
+    // This month up to now, and the same part of last month.
+    var monthSoFar: TimeInterval {
+        guard let month = calendar.dateInterval(of: .month, for: now) else { return 0 }
+        return time(in: DateInterval(start: month.start, end: now))
+    }
+
+    var lastMonthSoFar: TimeInterval {
+        guard let month = calendar.dateInterval(of: .month, for: now),
+              let start = calendar.date(byAdding: .month, value: -1, to: month.start)
+        else { return 0 }
+        let end = min(start.addingTimeInterval(now.timeIntervalSince(month.start)), month.start)
+        return time(in: DateInterval(start: start, end: end))
+    }
+
+    // Each hour of the day, first hour first, with the time in the Zone in that hour.
+    func hours(on day: Date) -> [(hour: Date, time: TimeInterval)] {
+        guard let interval = calendar.dateInterval(of: .day, for: day) else { return [] }
+        var hours: [(hour: Date, time: TimeInterval)] = []
+        var hour = interval.start
+        while hour < interval.end {
+            let next = calendar.date(byAdding: .hour, value: 1, to: hour)!
+            hours.append((hour, time(in: DateInterval(start: hour, end: next))))
+            hour = next
+        }
+        return hours
+    }
+
     func time(on day: Date) -> TimeInterval {
         guard let interval = calendar.dateInterval(of: .day, for: day) else { return 0 }
         return time(in: interval)
+    }
+
+    private var weekStart: Date {
+        calendar.date(byAdding: .day, value: -6, to: calendar.startOfDay(for: now))!
     }
 
     private func time(in interval: DateInterval) -> TimeInterval {
