@@ -159,7 +159,7 @@ private struct EmergencyUnlockView: View {
 
             Text(wasInterrupted ? "Wait reset. No unlock used." : isWaiting
                  ? "Leaving the app restarts the wait."
-                 : "Hold, then keep this screen open for 3 minutes.")
+                 : "Hold, then keep this screen open for 1 minute.")
                 .foregroundStyle(Color.zoneMute)
                 .padding(.top, 24)
         }
@@ -187,7 +187,7 @@ private struct EmergencyUnlockView: View {
             }
         ))
         .accessibilityLabel("Start emergency unlock")
-        .accessibilityHint("Double tap to start. Keep this screen open for 3 minutes.")
+        .accessibilityHint("Double tap to start. Keep this screen open for 1 minute.")
         .accessibilityAction {
             // Assistive input keeps the same delay without a continuous touch.
             beginHold()

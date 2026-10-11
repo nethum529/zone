@@ -14,18 +14,18 @@ struct EmergencyUnlockTests {
         #expect(!completed1)
     }
 
-    @Test func fullHoldRequiresAnotherThreeMinutes() {
+    @Test func fullHoldRequiresAnotherMinute() {
         var attempt = EmergencyUnlockAttempt()
         attempt.beginHold(at: 100)
         attempt.advance(at: 103)
         attempt.releaseHold()
-        #expect(attempt.secondsRemaining(at: 103) == 180)
-        #expect(attempt.secondsRemaining(at: 282.1) == 1)
-        let completed2 = attempt.complete(at: 282.99)
+        #expect(attempt.secondsRemaining(at: 103) == 60)
+        #expect(attempt.secondsRemaining(at: 162.1) == 1)
+        let completed2 = attempt.complete(at: 162.99)
         #expect(!completed2)
-        let completed3 = attempt.complete(at: 283)
+        let completed3 = attempt.complete(at: 163)
         #expect(completed3)
-        let completed4 = attempt.complete(at: 284)
+        let completed4 = attempt.complete(at: 164)
         #expect(!completed4)
     }
 
@@ -38,9 +38,9 @@ struct EmergencyUnlockTests {
         #expect(!completed5)
         attempt.beginHold(at: 1000)
         attempt.advance(at: 1003)
-        let completed6 = attempt.complete(at: 1182.99)
+        let completed6 = attempt.complete(at: 1062.99)
         #expect(!completed6)
-        let completed7 = attempt.complete(at: 1183)
+        let completed7 = attempt.complete(at: 1063)
         #expect(completed7)
     }
 
@@ -50,18 +50,18 @@ struct EmergencyUnlockTests {
         attempt.beginHold(at: 101)
         #expect(attempt.holdProgress(at: 101.5) == 0.5)
         attempt.advance(at: 103)
-        attempt.beginHold(at: 200)
-        attempt.advance(at: 250)
-        #expect(attempt.secondsRemaining(at: 250) == 33)
+        attempt.beginHold(at: 120)
+        attempt.advance(at: 130)
+        #expect(attempt.secondsRemaining(at: 130) == 33)
     }
 
     @Test func countdownUsesElapsedTimeEvenWhenTicksAreLate() {
         var attempt = EmergencyUnlockAttempt()
         attempt.beginHold(at: 100)
         attempt.advance(at: 105)
-        #expect(attempt.secondsRemaining(at: 105) == 180)
-        #expect(attempt.secondsRemaining(at: 200) == 85)
-        let completed8 = attempt.complete(at: 290)
+        #expect(attempt.secondsRemaining(at: 105) == 60)
+        #expect(attempt.secondsRemaining(at: 140) == 25)
+        let completed8 = attempt.complete(at: 170)
         #expect(completed8)
     }
 
@@ -106,7 +106,7 @@ struct EmergencyUnlockTests {
             defaults.set(Date.now.addingTimeInterval(900), forKey: ZoneLock.Keys.relockAt)
             let store = ZoneStore(defaults: defaults)
             var attempt = readyAttempt()
-            #expect(store.emergencyUnlock(attempt: &attempt, uptime: 283))
+            #expect(store.emergencyUnlock(attempt: &attempt, uptime: 163))
             #expect(!store.isZoned)
             #expect(store.relockAt == nil)
             #expect(defaults.object(forKey: ZoneLock.Keys.relockAt) == nil)
@@ -114,7 +114,7 @@ struct EmergencyUnlockTests {
             #expect(store.sessions.count == 1)
             #expect(store.sessions.first?.start == start)
             #expect(EmergencyUnlockAllowance(defaults: defaults).remaining(at: .now) == 2)
-            #expect(!store.emergencyUnlock(attempt: &attempt, uptime: 284))
+            #expect(!store.emergencyUnlock(attempt: &attempt, uptime: 164))
             let reloaded = ZoneStore(defaults: defaults)
             #expect(!reloaded.isZoned)
             #expect(reloaded.relockAt == nil)
@@ -128,7 +128,7 @@ struct EmergencyUnlockTests {
             defaults.set(Date.now, forKey: ZoneLock.Keys.zonedSince)
             let store = ZoneStore(defaults: defaults)
             var attempt = readyAttempt()
-            #expect(!store.emergencyUnlock(attempt: &attempt, uptime: 282.99))
+            #expect(!store.emergencyUnlock(attempt: &attempt, uptime: 162.99))
             attempt.cancel()
             #expect(!store.emergencyUnlock(attempt: &attempt, uptime: 500))
             #expect(store.isZoned)
@@ -144,7 +144,7 @@ struct EmergencyUnlockTests {
             defaults.set([Date.now, Date.now, Date.now], forKey: EmergencyUnlockAllowance.storageKey)
             let store = ZoneStore(defaults: defaults)
             var attempt = readyAttempt()
-            #expect(!store.emergencyUnlock(attempt: &attempt, uptime: 283))
+            #expect(!store.emergencyUnlock(attempt: &attempt, uptime: 163))
             #expect(store.isZoned)
             #expect(store.sessions.isEmpty)
         }
@@ -155,7 +155,7 @@ struct EmergencyUnlockTests {
         try withDefaults { defaults in
             let store = ZoneStore(defaults: defaults)
             var attempt = readyAttempt()
-            #expect(!store.emergencyUnlock(attempt: &attempt, uptime: 283))
+            #expect(!store.emergencyUnlock(attempt: &attempt, uptime: 163))
             #expect(EmergencyUnlockAllowance(defaults: defaults).remaining(at: .now) == 3)
         }
     }

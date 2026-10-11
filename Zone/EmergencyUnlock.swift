@@ -2,7 +2,7 @@ import Foundation
 
 struct EmergencyUnlockAttempt {
     static let holdDuration: TimeInterval = 3
-    static let waitDuration: TimeInterval = 180
+    static let waitDuration: TimeInterval = 60
 
     enum Phase: Hashable {
         case ready
