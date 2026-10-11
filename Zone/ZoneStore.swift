@@ -20,8 +20,7 @@ final class ZoneStore {
     var superZone: Bool {
         didSet { defaults.set(superZone, forKey: Keys.superZone) }
     }
-    // iOS does not monitor an activity shorter than 15 minutes.
-    static let relockChoices = [15, 30, 45, 60, 90, 120]
+    static let relockChoices = [5, 10, 15, 30, 45, 60, 90, 120]
     var relockMinutes: Int {
         didSet { defaults.set(relockMinutes, forKey: Keys.relockMinutes) }
     }
@@ -53,7 +52,7 @@ final class ZoneStore {
         scheduleStore = ZoneScheduleStore(defaults: defaults)
         authorization = AuthorizationCenter.shared.authorizationStatus
         superZone = defaults.bool(forKey: Keys.superZone)
-        relockMinutes = defaults.object(forKey: Keys.relockMinutes) as? Int ?? Self.relockChoices[0]
+        relockMinutes = defaults.object(forKey: Keys.relockMinutes) as? Int ?? 15
         profiles = ZoneProfiles.load(from: defaults)
         sessions = defaults.data(forKey: Keys.sessions)
             .flatMap { try? JSONDecoder().decode([ZoneSession].self, from: $0) } ?? []
@@ -138,9 +137,11 @@ final class ZoneStore {
         return true
     }
 
+    // iOS does not monitor an activity shorter than 15 minutes, so the activity starts at the relock time.
+    // The monitor extension locks when the activity starts. The end is a second chance.
     private func scheduleRelock() {
-        let start = Date.now
-        let end = start.addingTimeInterval(TimeInterval(relockMinutes * 60))
+        let start = Date.now.addingTimeInterval(TimeInterval(relockMinutes * 60))
+        let end = start.addingTimeInterval(15 * 60)
         let parts: Set<Calendar.Component> = [.year, .month, .day, .hour, .minute, .second]
         let schedule = DeviceActivitySchedule(
             intervalStart: Calendar.current.dateComponents(parts, from: start),
@@ -149,7 +150,7 @@ final class ZoneStore {
         )
         let shouldMonitor = ZoneLock.withStateLock {
             guard defaults.object(forKey: Keys.zonedSince) == nil else { return false }
-            defaults.set(end, forKey: Keys.relockAt)
+            defaults.set(start, forKey: Keys.relockAt)
             return true
         }
         guard shouldMonitor else { return }

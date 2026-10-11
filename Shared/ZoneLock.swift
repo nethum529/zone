@@ -10,7 +10,7 @@ enum ZoneLock {
     static var defaults: UserDefaults { UserDefaults(suiteName: "group.com.nethum.zone")! }
     static var shields: ManagedSettingsStore { ManagedSettingsStore(named: .init("zone")) }
 
-    // In Super Zone, the extension locks again when this activity ends.
+    // In Super Zone, the extension locks again when this activity starts.
     static var relockActivity: DeviceActivityName { DeviceActivityName("relock") }
 
     enum Keys {
