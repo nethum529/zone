@@ -63,6 +63,8 @@ struct SchedulesView: View {
                 .undoLine($pending, text: { "\($0.displayName) deleted" }, commit: commit)
                 .background(Color.zoneBackground)
             }
+            // Only while the list shows, not under the editor.
+            .swipeHint("schedules", row: editor == nil ? visible.first.flatMap { store.runningID != $0.id ? $0.id : nil } : nil)
             .schedulePage()
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {

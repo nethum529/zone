@@ -39,6 +39,8 @@ struct ZoneTagsView: View {
                 .padding(24)
                 .undoLine($pending, text: { "\(tags.title($0.id)) deleted" }, commit: commit)
             }
+            // Only while the list shows, not under a tag page or the add sheet.
+            .swipeHint("tags", row: visible.count > 1 && path.isEmpty && action == nil ? visible.first?.id : nil)
             .background(Color.zoneBackground)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
