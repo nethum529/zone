@@ -4,48 +4,48 @@ import Observation
 enum ZoneTagError: LocalizedError, Equatable {
     case verificationRequired
     case alreadyRegistered
-    case mainTagRequired
+    case lastTag
     case emptyTag
 
     var errorDescription: String? {
         switch self {
         case .verificationRequired: "Scan a saved tag before making changes."
         case .alreadyRegistered: "This tag is already saved. Scan a different tag."
-        case .mainTagRequired: "Register your main tag first."
+        case .lastTag: "Keep at least one tag, so you can leave the Zone."
         case .emptyTag: "Could not read the tag. Try again."
         }
     }
 }
 
-// Keeps the original main tag key so existing tags still work.
+// The saved tags. The first saved tags come from the old main and backup tag keys.
 @MainActor
 @Observable
 final class ZoneTags {
-    private(set) var mainID: String?
-    private(set) var backupID: String?
-    // Names the user gives the tags, like Desk or Keychain.
-    private(set) var mainName: String?
-    private(set) var backupName: String?
+    private(set) var all: [ZoneTag]
 
     private let defaults: UserDefaults
-    private static let backupKey = "backupTagID"
-    private static let mainNameKey = "mainTagName"
-    private static let backupNameKey = "backupTagName"
 
     init(defaults: UserDefaults = ZoneLock.defaults) {
         self.defaults = defaults
-        mainID = defaults.string(forKey: ZoneLock.Keys.tagID)
-        backupID = defaults.string(forKey: Self.backupKey)
-        mainName = defaults.string(forKey: Self.mainNameKey)
-        backupName = defaults.string(forKey: Self.backupNameKey)
+        all = ZoneTag.load(from: defaults)
+    }
+
+    func tag(_ id: ZoneTag.ID) -> ZoneTag? {
+        all.first { $0.id == id }
+    }
+
+    // The tag's name, or its place in the list when it has no name.
+    func title(_ id: ZoneTag.ID) -> String {
+        guard let index = all.firstIndex(where: { $0.id == id }) else { return "Tag" }
+        return all[index].name ?? "Tag \(index + 1)"
     }
 
     // An empty name removes the name.
-    func setName(_ name: String, backup: Bool) {
+    func rename(_ id: ZoneTag.ID, to name: String) {
+        guard let index = all.firstIndex(where: { $0.id == id }) else { return }
         let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        let key = backup ? Self.backupNameKey : Self.mainNameKey
-        if name.isEmpty { defaults.removeObject(forKey: key) } else { defaults.set(name, forKey: key) }
-        if backup { backupName = name.isEmpty ? nil : name } else { mainName = name.isEmpty ? nil : name }
+        all[index].name = name.isEmpty ? nil : name
+        save()
     }
 
     var requiresVerification: Bool {
@@ -54,29 +54,34 @@ final class ZoneTags {
     }
 
     func contains(_ id: String) -> Bool {
-        !id.isEmpty && (id == mainID || id == backupID)
+        !id.isEmpty && tag(id) != nil
     }
 
-    func setMain(_ id: String, verifiedBy savedID: String? = nil) throws {
+    func add(_ id: String, name: String? = nil, verifiedBy savedID: String? = nil) throws {
         try validateChange(verifiedBy: savedID)
         try validateNewTag(id)
-        defaults.set(id, forKey: ZoneLock.Keys.tagID)
-        mainID = id
+        all.append(ZoneTag(id: id))
+        if let name { rename(id, to: name) } else { save() }
     }
 
-    func setBackup(_ id: String, verifiedBy savedID: String? = nil) throws {
+    // The new tag keeps the old tag's name and place.
+    func replace(_ oldID: ZoneTag.ID, with id: String, verifiedBy savedID: String? = nil) throws {
         try validateChange(verifiedBy: savedID)
-        guard mainID != nil else { throw ZoneTagError.mainTagRequired }
         try validateNewTag(id)
-        defaults.set(id, forKey: Self.backupKey)
-        backupID = id
+        guard let index = all.firstIndex(where: { $0.id == oldID }) else { return }
+        all[index] = ZoneTag(id: id, name: all[index].name)
+        save()
     }
 
-    func removeBackup(verifiedBy savedID: String? = nil) throws {
+    func delete(_ id: ZoneTag.ID, verifiedBy savedID: String? = nil) throws {
         try validateChange(verifiedBy: savedID)
-        defaults.removeObject(forKey: Self.backupKey)
-        backupID = nil
-        setName("", backup: true)
+        guard all.count > 1 else { throw ZoneTagError.lastTag }
+        all.removeAll { $0.id == id }
+        save()
+    }
+
+    private func save() {
+        ZoneTag.save(all, to: defaults)
     }
 
     private func validateChange(verifiedBy savedID: String?) throws {

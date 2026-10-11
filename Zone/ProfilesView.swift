@@ -200,7 +200,7 @@ private struct ProfileView: View {
         }
     }
 
-    // A plain action row, like Remove backup tag in Zone tags.
+    // A plain action row, like Replace tag in Zone tags.
     private func actionRow(_ title: String) -> some View {
         Text(title)
             .frame(maxWidth: .infinity, alignment: .leading)

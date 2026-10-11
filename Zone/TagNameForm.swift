@@ -2,17 +2,15 @@ import SwiftUI
 
 // The step after a new tag scan: give the tag a name, so it is easy to find later.
 struct TagNameForm: View {
-    let tags: ZoneTags
-    let backup: Bool
+    let save: (String) -> Void
     let done: () -> Void
     @State private var name: String
     @FocusState private var editing: Bool
 
-    init(tags: ZoneTags, backup: Bool, done: @escaping () -> Void) {
-        self.tags = tags
-        self.backup = backup
+    init(name: String?, save: @escaping (String) -> Void, done: @escaping () -> Void) {
+        self.save = save
         self.done = done
-        _name = State(initialValue: (backup ? tags.backupName : tags.mainName) ?? "")
+        _name = State(initialValue: name ?? "")
     }
 
     var body: some View {
@@ -31,7 +29,7 @@ struct TagNameForm: View {
                     .multilineTextAlignment(.trailing)
                     .focused($editing)
                     .submitLabel(.done)
-                    .onSubmit(save)
+                    .onSubmit(saveAndClose)
                     .accessibilityLabel("Tag name")
             }
             .font(.system(size: 17))
@@ -44,7 +42,7 @@ struct TagNameForm: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .safeAreaInset(edge: .bottom) {
-            Button("Save", action: save)
+            Button("Save", action: saveAndClose)
                 .buttonStyle(ZoneButtonStyle())
                 .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 .padding(24)
@@ -59,8 +57,8 @@ struct TagNameForm: View {
         .onAppear { editing = true }
     }
 
-    private func save() {
-        tags.setName(name, backup: backup)
+    private func saveAndClose() {
+        save(name)
         done()
     }
 }

@@ -7,6 +7,8 @@ struct TagChangeView: View {
     @State private var scanner = TagScanner()
     @State private var phase: Phase
     @State private var verifiedID: String?
+    // The tag that the name step names.
+    @State private var newID: String?
     @State private var scanning = false
 
     private enum Phase { case verify, change, name }
@@ -19,8 +21,8 @@ struct TagChangeView: View {
 
     var body: some View {
         NavigationStack {
-            if phase == .name {
-                TagNameForm(tags: tags, backup: action == .addBackup || action == .replaceBackup) { dismiss() }
+            if phase == .name, let newID {
+                TagNameForm(name: tags.tag(newID)?.name) { tags.rename(newID, to: $0) } done: { dismiss() }
                     .toolbarBackground(Color.zoneBackground, for: .navigationBar)
                     .navigationBarTitleDisplayMode(.inline)
             } else {
@@ -81,10 +83,10 @@ struct TagChangeView: View {
     private var detail: String {
         switch phase {
         case .verify:
-            "Use your main or backup tag to allow this change."
+            "Use any saved tag to allow this change."
         case .change, .name:
-            action == .removeBackup
-                ? "Your main tag will still work."
+            action.isDelete
+                ? "Your other tags will still work."
                 : "Hold your iPhone near the new tag."
         }
     }
@@ -92,7 +94,7 @@ struct TagChangeView: View {
     private var buttonTitle: String {
         switch phase {
         case .verify: "Scan"
-        case .change, .name: action == .removeBackup ? "Remove" : "Scan"
+        case .change, .name: action.isDelete ? "Delete" : "Scan"
         }
     }
 
@@ -105,7 +107,7 @@ struct TagChangeView: View {
             guard let id = await scanner.scan(prompt: "Scan a saved tag to allow this change."),
                   !Task.isCancelled else { return }
             guard tags.contains(id) else {
-                scanner.errorMessage = "This tag is not saved. Use your main or backup tag."
+                scanner.errorMessage = "This tag is not saved. Use a saved tag."
                 return
             }
             verifiedID = id
@@ -114,20 +116,21 @@ struct TagChangeView: View {
         }
 
         do {
-            if action == .removeBackup {
-                try tags.removeBackup(verifiedBy: verifiedID)
+            if case .delete(let id) = action {
+                try tags.delete(id, verifiedBy: verifiedID)
             } else {
                 guard let id = await scanner.scan(prompt: "Hold your iPhone near the new tag."),
                       !Task.isCancelled else { return }
                 switch action {
-                case .addMain, .replaceMain: try tags.setMain(id, verifiedBy: verifiedID)
-                case .addBackup, .replaceBackup: try tags.setBackup(id, verifiedBy: verifiedID)
-                case .removeBackup: break
+                case .add: try tags.add(id, verifiedBy: verifiedID)
+                case .replace(let oldID): try tags.replace(oldID, with: id, verifiedBy: verifiedID)
+                case .delete: break
                 }
+                newID = id
             }
             verifiedID = nil
-            // A new tag gets a name next. A removed tag has nothing to name.
-            if action == .removeBackup { dismiss() } else { phase = .name }
+            // A new tag gets a name next. A deleted tag has nothing to name.
+            if action.isDelete { dismiss() } else { phase = .name }
         } catch {
             if error as? ZoneTagError == .verificationRequired {
                 verifiedID = nil
