@@ -39,6 +39,8 @@ struct ZoneTagsView: View {
                 .padding(24)
                 .undoLine($pending, text: { "\(tags.title($0.id)) deleted" }, commit: commit)
             }
+            // Only while the list shows, not under a tag page or the add sheet.
+            .swipeHint("tags", row: visible.count > 1 && path.isEmpty && action == nil ? visible.first?.id : nil)
             .background(Color.zoneBackground)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
@@ -49,7 +51,7 @@ struct ZoneTagsView: View {
         }
         .tint(Color.zoneBone)
         .foregroundStyle(Color.zoneInk)
-        .fontDesign(.rounded)
+        .font(.zone(.body))
         .preferredColorScheme(.dark)
         .sheet(item: $action) { TagChangeView(action: $0, tags: tags) }
         .onChange(of: tags.all) {
@@ -74,7 +76,7 @@ struct ZoneTagsView: View {
             .contentShape(.rect)
         }
         .accessibilityLabel(title)
-        .font(.system(size: 17))
+        .font(.zone(size: 17))
         .buttonStyle(ZoneRowStyle())
     }
 
@@ -136,7 +138,7 @@ private struct TagPage: View {
                     }
                     .padding(.top, 24)
                 }
-                .font(.system(size: 17))
+                .font(.zone(size: 17))
                 .buttonStyle(ZoneRowStyle())
                 .padding(.horizontal, 24)
                 .padding(.top, 24)

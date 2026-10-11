@@ -6,6 +6,7 @@ import UIKit
 // and a red Delete comes in at the same place. Tap Delete to delete.
 // A row that cannot be deleted moves a little, then springs back.
 // One row in a list can be open at a time.
+// The first visit to a list page shows once how to delete (see swipeHint).
 extension View {
     func swipeToDelete<ID: Hashable>(
         _ id: ID, open: Binding<ID?>, enabled: Bool, delete: @escaping () -> Void
@@ -26,6 +27,16 @@ private let swipeWidth: CGFloat = 64
 private extension EnvironmentValues {
     // 0 when the row shows its value, 1 when it shows Delete.
     @Entry var swipeProgress: Double = 0
+    // The hint that runs now on this page, if any.
+    @Entry var swipeHint = SwipeHintState()
+}
+
+private struct SwipeHintState {
+    // The row that nudges, and how far it shows Delete now.
+    var row: AnyHashable?
+    var nudge: Double = 0
+    // The line "Swipe a row left to delete" shows in the undo line spot.
+    var showsLine = false
 }
 
 private struct SwipePart: ViewModifier {
@@ -54,24 +65,32 @@ private struct SwipeToDelete<ID: Hashable>: ViewModifier {
     // The progress when the drag started, or nil when no drag runs.
     @State private var dragStart: Double?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.swipeHint) private var hint
 
     private var isOpen: Bool { open == id }
 
+    // The progress on screen. The hint nudge adds to the swipe.
+    private var shown: Double {
+        hint.row == AnyHashable(id) ? max(progress, hint.nudge) : progress
+    }
+
     func body(content: Content) -> some View {
         content
-            .environment(\.swipeProgress, progress)
+            .environment(\.swipeProgress, shown)
             .offset(x: reduceMotion ? 0 : resistance)
             .opacity(reduceMotion ? 1 + resistance / 60 : 1)
             .overlay {
-                if enabled, progress > 0 {
+                if enabled, shown > 0 {
                     ZStack(alignment: .trailing) {
                         // While Delete shows, a tap on the row only closes it.
                         Color.clear
                             .contentShape(.rect)
                             .onTapGesture { settle(open: false) }
+                            // The hint nudge does not catch taps.
+                            .allowsHitTesting(progress > 0)
                         Button(action: delete) {
                             Text("Delete")
-                                .font(.system(size: 17, weight: .semibold))
+                                .font(.zone(size: 17, weight: .semibold))
                                 .foregroundStyle(Color.zoneDelete)
                                 .padding(.leading, 16)
                                 .padding(.trailing, 24)
@@ -79,8 +98,8 @@ private struct SwipeToDelete<ID: Hashable>: ViewModifier {
                                 .contentShape(.rect)
                         }
                         .buttonStyle(ZoneRowStyle())
-                        .opacity(progress)
-                        .offset(x: reduceMotion ? 0 : 16 * (1 - progress))
+                        .opacity(shown)
+                        .offset(x: reduceMotion ? 0 : 16 * (1 - shown))
                         .allowsHitTesting(progress > 0.9)
                     }
                 }
@@ -193,29 +212,37 @@ private struct UndoLine<Item: Identifiable & Equatable>: ViewModifier {
     let text: (Item) -> String
     let commit: (Item) -> Void
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.swipeHint) private var hint
 
     func body(content: Content) -> some View {
         content
             .overlay(alignment: .top) {
-                if let item = pending {
+                if pending != nil || hint.showsLine {
                     HStack(spacing: 0) {
-                        Text(text(item))
-                            .foregroundStyle(Color.zoneMute)
-                            .lineLimit(1)
-                        Spacer(minLength: 16)
-                        Button {
-                            withAnimation(.smooth(duration: 0.34)) { pending = nil }
-                        } label: {
-                            Text("Undo")
-                                .fontWeight(.semibold)
-                                .foregroundStyle(Color.zoneBone)
-                                .frame(height: 44)
-                                .padding(.leading, 16)
-                                .contentShape(.rect)
+                        if let item = pending {
+                            Text(text(item))
+                                .foregroundStyle(Color.zoneMute)
+                                .lineLimit(1)
+                            Spacer(minLength: 16)
+                            Button {
+                                withAnimation(.smooth(duration: 0.34)) { pending = nil }
+                            } label: {
+                                Text("Undo")
+                                    .fontWeight(.semibold)
+                                    .foregroundStyle(Color.zoneBone)
+                                    .frame(height: 44)
+                                    .padding(.leading, 16)
+                                    .contentShape(.rect)
+                            }
+                            .buttonStyle(ZoneRowStyle())
+                        } else {
+                            Text("Swipe a row left to delete")
+                                .foregroundStyle(Color.zoneMute)
+                                .lineLimit(1)
+                            Spacer(minLength: 0)
                         }
-                        .buttonStyle(ZoneRowStyle())
                     }
-                    .font(.system(size: 15))
+                    .font(.zone(size: 15))
                     .frame(height: 44)
                     .padding(.horizontal, 24)
                     .background(Color.zoneBackground)
@@ -225,6 +252,7 @@ private struct UndoLine<Item: Identifiable & Equatable>: ViewModifier {
                 }
             }
             .animation(.timingCurve(0.2, 0.7, 0.2, 1, duration: 0.24), value: pending)
+            .animation(.timingCurve(0.2, 0.7, 0.2, 1, duration: 0.24), value: hint.showsLine)
             .task(id: pending?.id) {
                 guard let item = pending else { return }
                 try? await Task.sleep(for: .seconds(4))
@@ -233,5 +261,51 @@ private struct UndoLine<Item: Identifiable & Equatable>: ViewModifier {
             .onDisappear {
                 if let item = pending { commit(item) }
             }
+    }
+}
+
+// The first time a list page opens, it shows how to delete, once.
+// The first row nudges left two times, so Delete peeks in,
+// then the line "Swipe a row left to delete" shows for 3 s in the undo line spot.
+// Put it on the page after its bottom button, so the rows and the undo line both see it.
+// Give the first row that can be deleted, or nil when there is none yet.
+extension View {
+    func swipeHint<ID: Hashable>(_ page: String, row: ID?) -> some View {
+        modifier(SwipeHint(row: row.map(AnyHashable.init), seen: AppStorage(wrappedValue: false, "swipeHintSeen." + page)))
+    }
+}
+
+private struct SwipeHint: ViewModifier {
+    let row: AnyHashable?
+    @AppStorage var seen: Bool
+    @State private var hint = SwipeHintState()
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    func body(content: Content) -> some View {
+        content
+            .environment(\.swipeHint, hint)
+            .task(id: row) {
+                guard let row, !seen else { return }
+                // Wait for the sheet to come up.
+                try? await Task.sleep(for: .seconds(0.6))
+                if Task.isCancelled { return }
+                seen = true
+                hint.row = row
+                if !reduceMotion {
+                    for _ in 0..<2 {
+                        await nudge(to: 0.22, duration: 0.22)
+                        await nudge(to: 0, duration: 0.26)
+                        try? await Task.sleep(for: .seconds(0.09))
+                    }
+                }
+                hint.showsLine = true
+                try? await Task.sleep(for: .seconds(3))
+                hint.showsLine = false
+            }
+    }
+
+    private func nudge(to value: Double, duration: Double) async {
+        withAnimation(.interpolatingSpring(duration: duration, bounce: 0)) { hint.nudge = value }
+        try? await Task.sleep(for: .seconds(duration))
     }
 }

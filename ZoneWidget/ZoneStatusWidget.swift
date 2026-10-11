@@ -7,7 +7,7 @@ struct ZoneStatusWidget: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: "ZoneStatus", provider: ZoneStatusProvider()) { entry in
             ZoneStatusView(entry: entry)
-                .fontDesign(.rounded)
+                .font(.zone(.body))
                 .containerBackground(Color.zoneBackground, for: .widget)
         }
         .configurationDisplayName("Zone")
@@ -85,14 +85,14 @@ struct ZoneStatusView: View {
             }
             Spacer(minLength: 0)
             entry.todayText
-                .font(.system(size: 34, weight: .semibold))
+                .font(.zone(size: 34, weight: .semibold))
                 .tracking(-1)
                 .monospacedDigit()
                 .lineLimit(1)
                 .minimumScaleFactor(0.6)
                 .foregroundStyle(Color.zoneInk)
             Text("Today")
-                .font(.system(size: 15))
+                .font(.zone(size: 15))
                 .foregroundStyle(Color.zoneMute)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
@@ -117,7 +117,7 @@ struct ZoneStatusView: View {
     // The time today. A long time wraps to two lines.
     private var circularToday: some View {
         entry.todayText
-            .font(.system(size: 13, weight: .semibold))
+            .font(.zone(size: 13, weight: .semibold))
             .monospacedDigit()
             .multilineTextAlignment(.center)
             .lineLimit(2)
@@ -127,7 +127,7 @@ struct ZoneStatusView: View {
     private var rectangular: some View {
         VStack(alignment: .leading, spacing: 0) {
             Text(status)
-                .font(.headline)
+                .font(.zone(.headline))
                 .widgetAccentable()
             Text("\(entry.todayText) today")
                 .monospacedDigit()

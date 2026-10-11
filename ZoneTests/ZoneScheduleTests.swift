@@ -229,7 +229,7 @@ struct ZoneScheduleStoreTests {
         var attempt = EmergencyUnlockAttempt()
         attempt.beginHold(at: 100)
         attempt.advance(at: 103)
-        #expect(store.emergencyUnlock(attempt: &attempt, uptime: 283))
+        #expect(store.emergencyUnlock(attempt: &attempt, uptime: 163))
         let state = ZoneScheduleRuntime.state(in: defaults)
         #expect(state.run == nil)
         #expect(state.handledStarts[id] == start)

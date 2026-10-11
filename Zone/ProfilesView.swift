@@ -44,6 +44,8 @@ struct ProfilesView: View {
                 .padding(24)
                 .undoLine($pending, text: { "\($0.name) deleted" }, commit: commit)
             }
+            // Only while the list shows, not under a profile page.
+            .swipeHint("profiles", row: path.isEmpty ? visible.first.flatMap { canSwipeDelete($0.id) ? $0.id : nil } : nil)
             .profilePage()
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
@@ -60,7 +62,7 @@ struct ProfilesView: View {
         }
         .tint(Color.zoneBone)
         .foregroundStyle(Color.zoneInk)
-        .fontDesign(.rounded)
+        .font(.zone(.body))
         .preferredColorScheme(.dark)
         .presentationBackground(Color.zoneBackground)
     }
@@ -89,7 +91,7 @@ struct ProfilesView: View {
         }
         .accessibilityLabel(profile.name)
         .accessibilityAddTraits(current ? .isSelected : [])
-        .font(.system(size: 17))
+        .font(.zone(size: 17))
         .buttonStyle(ZoneRowStyle())
     }
 
@@ -130,6 +132,7 @@ private struct ProfileView: View {
     @State private var renaming = false
     @State private var newName = ""
     @State private var confirmingDelete = false
+    @State private var lockedTaps = 0
 
     var body: some View {
         let profile = store.profiles.profile(id) ?? last
@@ -151,11 +154,16 @@ private struct ProfileView: View {
                     VStack(spacing: 0) {
                         if !current {
                             Button {
+                                if store.isZoned {
+                                    lockedTaps += 1
+                                    return
+                                }
                                 withAnimation(.smooth(duration: 0.3)) { store.chooseProfile(id) }
                                 dismiss()
                             } label: {
                                 actionRow("Use this profile")
                             }
+                            .profileLockedNote(taps: lockedTaps)
                         }
                         Button {
                             newName = profile?.name ?? ""
@@ -170,7 +178,7 @@ private struct ProfileView: View {
                     }
                     .padding(.top, 24)
                 }
-                .font(.system(size: 17))
+                .font(.zone(size: 17))
                 .buttonStyle(ZoneRowStyle())
                 .padding(.horizontal, 24)
                 .padding(.top, 24)
@@ -236,7 +244,7 @@ private struct SitesView: View {
                                 .swipeLabel()
                             Spacer()
                         }
-                        .font(.system(size: 17))
+                        .font(.zone(size: 17))
                         .frame(height: 52)
                         .contentShape(.rect)
                         .padding(.horizontal, 24)

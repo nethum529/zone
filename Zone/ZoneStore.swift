@@ -52,7 +52,7 @@ final class ZoneStore {
     }
 
     var isZoned: Bool { zonedSince != nil }
-    // The profile in use cannot lose apps or be deleted while in the Zone.
+    // In the Zone the profile cannot change, and the profile in use cannot lose apps or be deleted.
     var isLocked: Bool { isZoned }
     var hasBlockedItems: Bool { profiles.current.blocksSomething }
 
@@ -119,15 +119,15 @@ final class ZoneStore {
         refresh()
     }
 
+    // In the Zone the profile cannot change. While Zone waits to lock again, the relock uses the new choice.
     func chooseProfile(_ id: ZoneProfile.ID) {
         ZoneLock.withStateLock {
             var profiles = ZoneProfiles.load(from: defaults)
-            guard profiles.profile(id) != nil, profiles.currentID != id else { return }
+            guard defaults.object(forKey: Keys.zonedSince) == nil,
+                profiles.profile(id) != nil, profiles.currentID != id
+            else { return }
             profiles.choose(id)
             profiles.save(to: defaults)
-            if let since = defaults.object(forKey: Keys.zonedSince) as? Date {
-                ZoneLock.applyLock(at: since, in: defaults)
-            }
         }
         refresh()
     }

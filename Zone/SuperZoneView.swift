@@ -13,7 +13,7 @@ struct SuperZoneView: View {
                 VStack(spacing: 0) {
                     Toggle(isOn: $store.superZone) {
                         Text("Super Zone")
-                            .font(.system(size: 20, weight: .medium))
+                            .font(.zone(size: 20, weight: .medium))
                             .foregroundStyle(Color.zoneInk)
                     }
                     .toggleStyle(ZoneToggleStyle(size: 20))
@@ -37,7 +37,7 @@ struct SuperZoneView: View {
                                 // The caret ink ends 4 pt inside its frame. Line it up with the switch edge.
                                 .padding(.trailing, -4)
                         }
-                        .font(.system(size: 20))
+                        .font(.zone(size: 20))
                         .foregroundStyle(Color.zoneInk)
                         .frame(height: 64)
                         .contentShape(.rect)

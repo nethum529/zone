@@ -54,7 +54,7 @@ private struct EmergencyUnlockView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     Text(isComplete ? "Out of the Zone" : "Emergency unlock")
-                        .font(.system(.largeTitle, design: .rounded, weight: .bold))
+                        .font(.zone(.largeTitle, weight: .bold))
                         .contentTransition(.opacity)
                         .padding(.top, 8)
                         .accessibilityAddTraits(.isHeader)
@@ -106,7 +106,7 @@ private struct EmergencyUnlockView: View {
         }
         .background(Color.zoneBackground)
         .foregroundStyle(Color.zoneInk)
-        .fontDesign(.rounded)
+        .font(.zone(.body))
         .preferredColorScheme(.dark)
         .transaction { if reduceMotion { $0.animation = nil } }
         .onChange(of: scenePhase) {
@@ -136,7 +136,7 @@ private struct EmergencyUnlockView: View {
         let seconds = attempt.secondsRemaining(at: uptime)
         return VStack(alignment: .leading, spacing: 0) {
             Text(String(format: "%d:%02d", seconds / 60, seconds % 60))
-                .font(.system(size: 104, weight: .bold, design: .rounded))
+                .font(.zone(size: 104, weight: .bold))
                 .tracking(-4)
                 .monospacedDigit()
                 .contentTransition(reduceMotion ? .identity : .numericText(countsDown: true))
@@ -159,7 +159,7 @@ private struct EmergencyUnlockView: View {
 
             Text(wasInterrupted ? "Wait reset. No unlock used." : isWaiting
                  ? "Leaving the app restarts the wait."
-                 : "Hold, then keep this screen open for 3 minutes.")
+                 : "Hold, then keep this screen open for 1 minute.")
                 .foregroundStyle(Color.zoneMute)
                 .padding(.top, 24)
         }
@@ -187,7 +187,7 @@ private struct EmergencyUnlockView: View {
             }
         ))
         .accessibilityLabel("Start emergency unlock")
-        .accessibilityHint("Double tap to start. Keep this screen open for 3 minutes.")
+        .accessibilityHint("Double tap to start. Keep this screen open for 1 minute.")
         .accessibilityAction {
             // Assistive input keeps the same delay without a continuous touch.
             beginHold()
@@ -238,7 +238,7 @@ private struct EmergencyHoldStyle: ButtonStyle {
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.body.weight(.semibold))
+            .font(.zone(.body, weight: .semibold))
             .foregroundStyle(Color.zoneBackground)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 16)
