@@ -132,6 +132,7 @@ private struct ProfileView: View {
     @State private var renaming = false
     @State private var newName = ""
     @State private var confirmingDelete = false
+    @State private var lockedTaps = 0
 
     var body: some View {
         let profile = store.profiles.profile(id) ?? last
@@ -153,11 +154,16 @@ private struct ProfileView: View {
                     VStack(spacing: 0) {
                         if !current {
                             Button {
+                                if store.isZoned {
+                                    lockedTaps += 1
+                                    return
+                                }
                                 withAnimation(.smooth(duration: 0.3)) { store.chooseProfile(id) }
                                 dismiss()
                             } label: {
                                 actionRow("Use this profile")
                             }
+                            .profileLockedNote(taps: lockedTaps)
                         }
                         Button {
                             newName = profile?.name ?? ""
