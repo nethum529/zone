@@ -47,7 +47,8 @@ enum ZoneLock {
     }
 
     static func applyLock(at now: Date, in defaults: UserDefaults = ZoneLock.defaults) {
-        let selection = ZoneProfiles.load(from: defaults).current.selection
+        let profile = ZoneProfiles.load(from: defaults).current
+        let selection = profile.selection
         let shields = shields
         let apps = selection.applicationTokens
         let categories = selection.categoryTokens
@@ -56,6 +57,9 @@ enum ZoneLock {
         shields.shield.applicationCategories = categories.isEmpty ? nil : .specific(categories)
         shields.shield.webDomains = domains.isEmpty ? nil : domains
         shields.shield.webDomainCategories = categories.isEmpty ? nil : .specific(categories)
+        // Typed sites have no tokens, so the shield cannot show them. The web filter blocks them instead.
+        let sites = Set(profile.sites.map { WebDomain(domain: $0) })
+        shields.webContent.blockedByFilter = sites.isEmpty ? nil : .specific(sites)
         defaults.set(now, forKey: Keys.zonedSince)
         defaults.removeObject(forKey: Keys.relockAt)
     }

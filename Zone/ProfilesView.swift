@@ -126,6 +126,7 @@ private struct ProfileView: View {
     // The last known profile, so the page stays drawn while it slides away after a delete.
     @State private var last: ZoneProfile?
     @State private var picking = false
+    @State private var editingSites = false
     @State private var renaming = false
     @State private var newName = ""
     @State private var confirmingDelete = false
@@ -141,6 +142,10 @@ private struct ProfileView: View {
                 VStack(spacing: 0) {
                     Button { picking = true } label: {
                         ZoneRow("Blocked apps", value: appsText(profile?.selection ?? FamilyActivitySelection()))
+                    }
+                    .disabled(inUse)
+                    Button { editingSites = true } label: {
+                        ZoneRow("Blocked sites", value: sitesText(profile?.sites ?? []))
                     }
                     .disabled(inUse)
                     VStack(spacing: 0) {
@@ -179,6 +184,7 @@ private struct ProfileView: View {
             if let new { last = new }
         }
         .familyActivityPicker(isPresented: $picking, selection: selection)
+        .navigationDestination(isPresented: $editingSites) { SitesView(id: id) }
         .alert("Rename profile", isPresented: $renaming) {
             TextField("Name", text: $newName)
             Button("Cancel", role: .cancel) {}
@@ -211,6 +217,67 @@ private struct ProfileView: View {
     }
 }
 
+// The sites a profile blocks by address. Swipe a row to remove it.
+private struct SitesView: View {
+    @Environment(ZoneStore.self) private var store
+    let id: ZoneProfile.ID
+    @State private var adding = false
+    @State private var newSite = ""
+    @State private var swiped: String?
+
+    var body: some View {
+        let sites = store.profiles.profile(id)?.sites ?? []
+        VStack(spacing: 0) {
+            ZoneTitle("Blocked sites")
+            ScrollView {
+                VStack(spacing: 0) {
+                    ForEach(sites, id: \.self) { site in
+                        HStack {
+                            Text(site)
+                                .lineLimit(1)
+                                .swipeLabel()
+                            Spacer()
+                        }
+                        .font(.system(size: 17))
+                        .frame(height: 52)
+                        .contentShape(.rect)
+                        .padding(.horizontal, 24)
+                        .swipeToDelete(site, open: $swiped, enabled: true) {
+                            withAnimation(.smooth(duration: 0.34)) {
+                                swiped = nil
+                                store.profiles.removeSite(site, from: id)
+                            }
+                        }
+                    }
+                }
+            }
+            .contentMargins(.top, 24, for: .scrollContent)
+            .onScrollPhaseChange { _, phase in
+                if phase != .idle { swiped = nil }
+            }
+        }
+        .safeAreaInset(edge: .bottom) {
+            Button("Add site") {
+                newSite = ""
+                adding = true
+            }
+            .buttonStyle(ZoneButtonStyle())
+            .disabled(sites.count >= ZoneProfile.maxSites)
+            .padding(24)
+        }
+        .profilePage()
+        .alert("Add site", isPresented: $adding) {
+            TextField("instagram.com", text: $newSite)
+                .keyboardType(.URL)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+            Button("Cancel", role: .cancel) {}
+            Button("Add") { store.profiles.addSite(newSite, to: id) }
+                .disabled(ZoneProfile.site(from: newSite) == nil)
+        }
+    }
+}
+
 private extension ZoneStore {
     // Keep at least one profile, and never delete the one that is locked now.
     func canDeleteProfile(_ id: ZoneProfile.ID) -> Bool {
@@ -234,6 +301,11 @@ func appsText(_ selection: FamilyActivitySelection) -> String {
         + selection.categoryTokens.count
         + selection.webDomainTokens.count
     return count == 0 ? "None" : "\(count) app\(count == 1 ? "" : "s")"
+}
+
+// "None", "1 site" or "3 sites".
+private func sitesText(_ sites: [String]) -> String {
+    sites.isEmpty ? "None" : "\(sites.count) site\(sites.count == 1 ? "" : "s")"
 }
 
 private func isBlank(_ name: String) -> Bool {

@@ -41,10 +41,7 @@ enum ZoneScheduleRuntime {
     static func reconcile(at now: Date = .now, in defaults: UserDefaults = ZoneLock.defaults) {
         ZoneLock.withStateLock {
             reconcile(at: now, defaults: defaults, canEnter: { profile in
-                let selection = profile.selection
-                return defaults.string(forKey: ZoneLock.Keys.tagID) != nil
-                    && (!selection.applicationTokens.isEmpty || !selection.categoryTokens.isEmpty
-                        || !selection.webDomainTokens.isEmpty)
+                defaults.string(forKey: ZoneLock.Keys.tagID) != nil && profile.blocksSomething
             },
                       lock: { ZoneLock.applyLock(at: $0, in: defaults) }, unlock: { ZoneLock.applyUnlock(at: $0, in: defaults) })
         }
