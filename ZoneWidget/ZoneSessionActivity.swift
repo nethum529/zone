@@ -26,7 +26,7 @@ struct ZoneSessionActivity: Widget {
                 ZoneMark(size: 18, color: .zoneBone)
             } compactTrailing: {
                 SessionTimer(since: since)
-                    .font(.system(size: 15, weight: .semibold, design: .rounded))
+                    .font(.zone(size: 15, weight: .semibold))
                     .foregroundStyle(Color.zoneInk)
                     .multilineTextAlignment(.trailing)
                     .frame(maxWidth: 64, alignment: .trailing)
@@ -46,10 +46,10 @@ private struct SessionSummary: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             SessionTimer(since: since)
-                .font(.system(size: timerSize, weight: .bold, design: .rounded))
+                .font(.zone(size: timerSize, weight: .bold))
                 .tracking(-1)
             Text("In the Zone since \(since.formatted(date: .omitted, time: .shortened))")
-                .font(.system(size: 15, design: .rounded))
+                .font(.zone(size: 15))
                 .foregroundStyle(Color.zoneMute)
         }
         .foregroundStyle(Color.zoneInk)

@@ -29,7 +29,7 @@ struct ScheduleProfileSheet: View {
                             .accessibilityAddTraits(profile.id == (profileID ?? zone.profiles.currentID) ? .isSelected : [])
                         }
                     }
-                    .font(.body)
+                    .font(.zone(.body))
                     .buttonStyle(ZoneRowStyle())
                     .padding(.horizontal, 24)
                     .padding(.top, 24)
@@ -66,13 +66,13 @@ struct ScheduleDaysSheet: View {
                                 get: { selection.contains(day) },
                                 set: { if $0 { selection.insert(day) } else { selection.remove(day) } }
                             )) {
-                                Text(Calendar.current.weekdaySymbols[day - 1]).font(.body)
+                                Text(Calendar.current.weekdaySymbols[day - 1]).font(.zone(.body))
                             }
                             .toggleStyle(ZoneToggleStyle())
                         }
                         if selection.isEmpty {
                             Text("Choose at least one day.")
-                                .font(.footnote)
+                                .font(.zone(.footnote))
                                 .foregroundStyle(Color.zoneMute)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .padding(.top, 16)

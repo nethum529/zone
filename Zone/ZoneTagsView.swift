@@ -49,7 +49,7 @@ struct ZoneTagsView: View {
         }
         .tint(Color.zoneBone)
         .foregroundStyle(Color.zoneInk)
-        .fontDesign(.rounded)
+        .font(.zone(.body))
         .preferredColorScheme(.dark)
         .sheet(item: $action) { TagChangeView(action: $0, tags: tags) }
         .onChange(of: tags.all) {
@@ -74,7 +74,7 @@ struct ZoneTagsView: View {
             .contentShape(.rect)
         }
         .accessibilityLabel(title)
-        .font(.system(size: 17))
+        .font(.zone(size: 17))
         .buttonStyle(ZoneRowStyle())
     }
 
@@ -136,7 +136,7 @@ private struct TagPage: View {
                     }
                     .padding(.top, 24)
                 }
-                .font(.system(size: 17))
+                .font(.zone(size: 17))
                 .buttonStyle(ZoneRowStyle())
                 .padding(.horizontal, 24)
                 .padding(.top, 24)

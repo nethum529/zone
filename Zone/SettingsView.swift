@@ -56,7 +56,7 @@ struct SettingsView: View {
                 // The caret ink ends 4 pt inside its frame. Line it up with the switch edge.
                 .padding(.trailing, -4)
         }
-        .font(.system(size: 20))
+        .font(.zone(size: 20))
         .foregroundStyle(Color.zoneInk)
         .frame(height: 64)
         .contentShape(.rect)

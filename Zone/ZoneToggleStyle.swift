@@ -26,13 +26,13 @@ struct ZoneToggleStyle: ToggleStyle {
                         .offset(y: isOn ? 0 : travel)
                         .opacity(isOn ? 1 : 0)
                 }
-                .font(.system(size: size, weight: .semibold))
+                .font(.zone(size: size, weight: .semibold))
                 .frame(width: 48, height: 30, alignment: .trailing)
                 .clipped()
                 .animation(.timingCurve(0.23, 1, 0.32, 1, duration: 0.22), value: isOn)
                 .accessibilityHidden(true)
             }
-            .font(.system(size: 17))
+            .font(.zone(size: 17))
             .frame(height: 52)
             .contentShape(.rect)
         }

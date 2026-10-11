@@ -26,7 +26,7 @@ struct ProfileMenu: View {
                     .frame(width: 14, height: 14)
                     .foregroundStyle(Color.zoneMute)
             }
-            .font(.system(size: 17))
+            .font(.zone(size: 17))
             .frame(height: 44)
             .contentShape(.rect)
         }

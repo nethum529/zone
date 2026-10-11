@@ -113,11 +113,11 @@ private struct Readout: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(value)
-                .font(.system(size: 40, weight: .semibold))
+                .font(.zone(size: 40, weight: .semibold))
                 .tracking(-1)
                 .monospacedDigit()
             Text(detail)
-                .font(.system(size: 15))
+                .font(.zone(size: 15))
                 .foregroundStyle(Color.zoneMute)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -133,10 +133,10 @@ private struct Bubble: View {
     var body: some View {
         VStack(spacing: 1) {
             Text(zoneTimeText(time))
-                .font(.system(size: 16, weight: .bold))
+                .font(.zone(size: 16, weight: .bold))
                 .monospacedDigit()
             Text(label)
-                .font(.system(size: 12))
+                .font(.zone(size: 12))
         }
         .foregroundStyle(Color.zoneBackground)
         .fixedSize()
