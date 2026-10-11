@@ -4,6 +4,7 @@ import UIKit
 // Swipe a row left to delete it, as in Profiles and Schedules.
 // The row does not move. Its value slot (check, status, caret) fades away
 // and a red Delete comes in at the same place. Tap Delete to delete.
+// A row that cannot be deleted moves a little, then springs back.
 // One row in a list can be open at a time.
 extension View {
     func swipeToDelete<ID: Hashable>(
@@ -49,6 +50,7 @@ private struct SwipeToDelete<ID: Hashable>: ViewModifier {
     let enabled: Bool
     let delete: () -> Void
     @State private var progress: Double = 0
+    @State private var resistance: CGFloat = 0
     // The progress when the drag started, or nil when no drag runs.
     @State private var dragStart: Double?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -58,8 +60,10 @@ private struct SwipeToDelete<ID: Hashable>: ViewModifier {
     func body(content: Content) -> some View {
         content
             .environment(\.swipeProgress, progress)
+            .offset(x: reduceMotion ? 0 : resistance)
+            .opacity(reduceMotion ? 1 + resistance / 60 : 1)
             .overlay {
-                if progress > 0 {
+                if enabled, progress > 0 {
                     ZStack(alignment: .trailing) {
                         // While Delete shows, a tap on the row only closes it.
                         Color.clear
@@ -81,7 +85,7 @@ private struct SwipeToDelete<ID: Hashable>: ViewModifier {
                     }
                 }
             }
-            .gesture(SwipePan(enabled: enabled, changed: dragChanged, ended: dragEnded))
+            .gesture(SwipePan(changed: dragChanged, ended: dragEnded))
             .onChange(of: isOpen) { _, isOpen in
                 // Another row opened, or the list closed this one.
                 if !isOpen, dragStart == nil, progress > 0 { settle(open: false) }
@@ -103,7 +107,16 @@ private struct SwipeToDelete<ID: Hashable>: ViewModifier {
         let x = -(dragStart ?? 0) * swipeWidth + translation
         var instant = Transaction()
         instant.disablesAnimations = true
-        withTransaction(instant) { progress = min(1, max(0, -x / swipeWidth)) }
+        withTransaction(instant) {
+            if enabled {
+                resistance = 0
+                progress = min(1, max(0, -x / swipeWidth))
+            } else {
+                let distance = max(0, -translation)
+                resistance = -18 * distance / (distance + swipeWidth)
+                progress = 0
+            }
+        }
     }
 
     private func dragEnded(_ translation: CGFloat, _ velocity: CGFloat) {
@@ -116,11 +129,15 @@ private struct SwipeToDelete<ID: Hashable>: ViewModifier {
 
     // Spring to shown or hidden from where the row is now, with the finger's speed.
     private func settle(open shown: Bool, velocity: Double = 0) {
+        let shown = shown && enabled
         let target: Double = shown ? 1 : 0
         let distance = target - progress
         let relative = abs(distance) > 0.001 ? velocity / distance : 0
         let spring = Animation.interpolatingSpring(duration: 0.3, bounce: 0, initialVelocity: relative)
-        withAnimation(reduceMotion ? nil : spring) { progress = target }
+        withAnimation(reduceMotion ? nil : spring) {
+            progress = target
+            resistance = 0
+        }
         if shown { open = id } else if isOpen { open = nil }
     }
 }
@@ -128,7 +145,6 @@ private struct SwipeToDelete<ID: Hashable>: ViewModifier {
 // A pan that starts only when the finger moves more sideways than up or down,
 // so a vertical move still scrolls the list.
 private struct SwipePan: UIGestureRecognizerRepresentable {
-    let enabled: Bool
     let changed: (CGFloat) -> Void
     let ended: (CGFloat, CGFloat) -> Void
 
@@ -138,10 +154,6 @@ private struct SwipePan: UIGestureRecognizerRepresentable {
         let pan = UIPanGestureRecognizer()
         pan.delegate = context.coordinator
         return pan
-    }
-
-    func updateUIGestureRecognizer(_ pan: UIPanGestureRecognizer, context: Context) {
-        pan.isEnabled = enabled
     }
 
     func handleUIGestureRecognizerAction(_ pan: UIPanGestureRecognizer, context: Context) {
