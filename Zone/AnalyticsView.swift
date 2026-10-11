@@ -3,7 +3,9 @@ import SwiftUI
 
 struct AnalyticsView: View {
     @Environment(ZoneStore.self) private var store
-    @State private var page = 0
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    // The row with its chart open. Only one is open at a time.
+    @State private var open: BarsKind?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -11,31 +13,77 @@ struct AnalyticsView: View {
             // Update every minute, so the current session counts as it runs.
             TimelineView(.periodic(from: .now, by: 60)) { context in
                 let stats = ZoneStats(sessions: store.sessions(at: context.date), now: context.date)
-                TabView(selection: $page) {
-                    MonthPage(stats: stats).page().tag(0)
-                    WeekPage(stats: stats).page().tag(1)
+                ScrollView {
+                    page(stats)
+                        .padding(.horizontal, 24)
+                        .padding(.top, 16)
+                        .padding(.bottom, 24)
                 }
-                .tabViewStyle(.page(indexDisplayMode: .never))
+                .scrollIndicators(.hidden)
+                .scrollBounceBehavior(.basedOnSize)
             }
-            HStack(spacing: 6) {
-                ForEach(0..<2, id: \.self) { index in
-                    Circle()
-                        .fill(page == index ? Color.zoneInk : Color(rgb: 0x3A3A42))
-                        .frame(width: 6, height: 6)
-                }
-            }
-            .padding(.vertical, 12)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.zoneBackground)
     }
-}
 
-private extension View {
-    func page() -> some View {
-        padding(.horizontal, 24)
-            .padding(.top, 16)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+    private func page(_ stats: ZoneStats) -> some View {
+        let week = stats.lastWeek
+        let lengths = stats.weekSessions.map(\.duration)
+        let change = changeText(week, from: stats.weekBefore).map { ", \($0.lowercased()) from the 7 before" } ?? ""
+        return VStack(spacing: 0) {
+            Readout(value: zoneTimeText(week), detail: "Last 7 days\(change)")
+            VStack(spacing: 0) {
+                section(.hours, "Today", value: zoneTimeText(stats.today), stats: stats)
+                section(.week, "Average a day", value: zoneTimeText(week / 7), stats: stats)
+                section(.month, "This month", value: zoneTimeText(stats.monthSoFar), note: changeText(stats.monthSoFar, from: stats.lastMonthSoFar), stats: stats)
+            }
+            .buttonStyle(ZoneRowStyle())
+            .padding(.bottom, 20)
+            ZoneRow("Average session", value: zoneTimeText(lengths.isEmpty ? 0 : lengths.reduce(0, +) / Double(lengths.count))) { EmptyView() }
+            ZoneRow("Longest session", value: zoneTimeText(lengths.max() ?? 0)) { EmptyView() }
+        }
+    }
+
+    // A row that opens its chart under it.
+    private func section(_ kind: BarsKind, _ label: String, value: String, note: String? = nil, stats: ZoneStats) -> some View {
+        let isOpen = open == kind
+        return VStack(spacing: 0) {
+            Button {
+                // With reduced motion the chart shows at once.
+                withAnimation(reduceMotion ? nil : .smooth(duration: isOpen ? 0.35 : 0.45)) {
+                    open = isOpen ? nil : kind
+                }
+            } label: {
+                ZoneRow(label, value: value, note: note) {
+                    ZoneCaret().rotationEffect(.degrees(isOpen ? 90 : 0))
+                }
+            }
+            .accessibilityValue(isOpen ? "Chart shown" : "")
+            // The chart slides down from under the row, inside the space that opens.
+            VStack(spacing: 0) {
+                if isOpen {
+                    Bars(kind: kind, items: items(kind, stats))
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                }
+            }
+            .clipped()
+        }
+    }
+
+    private func items(_ kind: BarsKind, _ stats: ZoneStats) -> [(day: Date, time: TimeInterval)] {
+        switch kind {
+        case .hours: stats.hours(on: stats.now).map { ($0.hour, $0.time) }
+        case .week: stats.lastDays(7)
+        case .month: stats.monthDays()
+        }
+    }
+
+    // "Up 12%" or "Down 5%". Nothing when there is no time to compare with.
+    private func changeText(_ time: TimeInterval, from before: TimeInterval) -> String? {
+        guard before > 0 else { return nil }
+        let percent = Int(((time - before) / before * 100).rounded())
+        return percent >= 0 ? "Up \(percent)%" : "Down \(-percent)%"
     }
 }
 
@@ -52,7 +100,7 @@ private extension View {
         }
     }
 
-    // Grows out of the day it points at. With reduced motion it only fades.
+    // Grows out of the bar it points at. With reduced motion it only fades.
     func bubbleTransition(reduceMotion: Bool) -> some View {
         transition(reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.8, anchor: .bottom)))
     }
@@ -61,7 +109,6 @@ private extension View {
 private struct Readout: View {
     let value: String
     let detail: String
-    var flame = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
@@ -69,34 +116,26 @@ private struct Readout: View {
                 .font(.system(size: 40, weight: .semibold))
                 .tracking(-1)
                 .monospacedDigit()
-            HStack(spacing: 5) {
-                if flame {
-                    Image("fire-fill")
-                        .resizable()
-                        .frame(width: 15, height: 15)
-                        .foregroundStyle(Color.zoneBone)
-                }
-                Text(detail)
-            }
-            .font(.system(size: 15))
-            .foregroundStyle(Color.zoneMute)
+            Text(detail)
+                .font(.system(size: 15))
+                .foregroundStyle(Color.zoneMute)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .frame(height: 84, alignment: .top)
     }
 }
 
-// The day and its total, shown over the square or bar the user taps.
+// The total and its hour or day, shown over the bar the user taps.
 private struct Bubble: View {
-    let day: Date
     let time: TimeInterval
+    let label: String
 
     var body: some View {
         VStack(spacing: 1) {
             Text(zoneTimeText(time))
                 .font(.system(size: 16, weight: .bold))
                 .monospacedDigit()
-            Text(Calendar.current.isDateInToday(day) ? "Today" : day.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated)))
+            Text(label)
                 .font(.system(size: 12))
         }
         .foregroundStyle(Color.zoneBackground)
@@ -107,180 +146,109 @@ private struct Bubble: View {
     }
 }
 
-// Slide 1: a square for each day of this month, brighter for more time in the Zone.
-private struct MonthPage: View {
-    let stats: ZoneStats
-    @State private var selected: Date?
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+// The three charts: the hours of today, the last 7 days, and the days of this month.
+private enum BarsKind {
+    case hours, week, month
 
-    private let calendar = Calendar.current
+    var unit: Calendar.Component { self == .hours ? .hour : .day }
 
-    var body: some View {
-        let days = stats.monthDays()
-        let total = days.reduce(0) { $0 + $1.time }
-        let streak = stats.streak
-        VStack(spacing: 0) {
-            Readout(value: zoneTimeText(total), detail: "\(streak) day streak", flame: true)
-            weekdayHeader
-            grid(days)
-                .padding(.top, 8)
-        }
-        .hidesSelection($selected)
-    }
+    // From the start of a bar to its middle.
+    var half: TimeInterval { self == .hours ? 1800 : 12 * 3600 }
 
-    private var weekdayHeader: some View {
-        let symbols = calendar.veryShortStandaloneWeekdaySymbols
-        let first = calendar.firstWeekday - 1
-        let ordered = Array(symbols[first...] + symbols[..<first])
-        return HStack(spacing: 6) {
-            ForEach(ordered.indices, id: \.self) { index in
-                Text(ordered[index])
-                    .font(.system(size: 12))
-                    .foregroundStyle(Color.zoneMute)
-                    .frame(maxWidth: .infinity)
-            }
-        }
-    }
-
-    private func grid(_ days: [(day: Date, time: TimeInterval)]) -> some View {
-        let lead = days.first.map { (calendar.component(.weekday, from: $0.day) - calendar.firstWeekday + 7) % 7 } ?? 0
-        let cells: [(day: Date, time: TimeInterval)?] = Array(repeating: nil, count: lead) + days.map { $0 }
-        let rows = stride(from: 0, to: cells.count, by: 7).map { Array(cells[$0..<min($0 + 7, cells.count)]) }
-        return VStack(spacing: 6) {
-            ForEach(rows.indices, id: \.self) { r in
-                let row = rows[r]
-                HStack(spacing: 6) {
-                    ForEach(0..<7, id: \.self) { c in
-                        if c < row.count, let item = row[c] {
-                            square(item, column: c)
-                        } else {
-                            Color.clear.aspectRatio(1, contentMode: .fit)
-                        }
-                    }
-                }
-                .zIndex(row.contains { $0?.day == selected } ? 1 : 0)
-            }
-        }
-    }
-
-    private func square(_ item: (day: Date, time: TimeInterval), column: Int) -> some View {
-        let future = item.day > stats.now
-        let isSelected = item.day == selected
-        let isToday = calendar.isDate(item.day, inSameDayAs: stats.now)
-        // The bubble stays inside the screen at the first and last column.
-        let alignment: Alignment = column == 0 ? .bottomLeading : column == 6 ? .bottomTrailing : .bottom
-        return RoundedRectangle(cornerRadius: 8)
-            .fill(fill(item.time, future: future))
-            .aspectRatio(1, contentMode: .fit)
-            .overlay {
-                if isToday || isSelected {
-                    RoundedRectangle(cornerRadius: 8).strokeBorder(Color.zoneInk, lineWidth: 2)
-                }
-            }
-            .opacity(selected == nil || isSelected ? 1 : 0.35)
-            .overlay(alignment: .top) {
-                // A line on the top edge of the square, so the bubble sits above it.
-                Color.clear
-                    .frame(height: 0)
-                    .overlay(alignment: alignment) {
-                        if isSelected {
-                            Bubble(day: item.day, time: item.time)
-                                .padding(.bottom, 6)
-                                .bubbleTransition(reduceMotion: reduceMotion)
-                        }
-                    }
-            }
-            .contentShape(.rect)
-            .onTapGesture {
-                guard !future else { return }
-                withAnimation(bubbleAnimation) { selected = isSelected ? nil : item.day }
-            }
-            .accessibilityElement()
-            .accessibilityLabel(item.day.formatted(date: .complete, time: .omitted))
-            .accessibilityValue(zoneTimeText(item.time))
-            .accessibilityAddTraits(.isButton)
-    }
-
-    private func fill(_ time: TimeInterval, future: Bool) -> Color {
-        if future { return Color(rgb: 0x1B1B21) }
-        switch time {
-        case 0: return Color(rgb: 0x22222A)
-        case ..<3600: return Color.zoneBone.opacity(0.3)
-        case ..<7200: return Color.zoneBone.opacity(0.6)
-        default: return Color.zoneBone
+    func label(_ date: Date) -> String {
+        switch self {
+        case .hours: date.formatted(.dateTime.hour())
+        case .week, .month: Calendar.current.isDateInToday(date) ? "Today" : date.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated))
         }
     }
 }
 
-// Slide 2: the last 7 days as bars, like Screen Time, with the daily average.
-private struct WeekPage: View {
-    let stats: ZoneStats
+// Bars like Screen Time. The week has a line at the daily average. Tap a bar for its total.
+private struct Bars: View {
+    let kind: BarsKind
+    let items: [(day: Date, time: TimeInterval)]
     @State private var selected: Date?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        let days = stats.lastDays(7)
-        let total = days.reduce(0) { $0 + $1.time }
-        let average = total / 7
+        let average = items.reduce(0) { $0 + $1.time } / Double(max(1, items.count))
         // Room above the tallest bar for the bubble.
-        let top = max(1, (days.map(\.time).max() ?? 0) / 3600) * 1.3
-        VStack(spacing: 0) {
-            Readout(value: zoneTimeText(average), detail: "Total \(zoneTimeText(total))")
-            Chart {
-                ForEach(days, id: \.day) { item in
-                    BarMark(
-                        x: .value("Day", item.day, unit: .day),
-                        y: .value("Hours", item.time / 3600)
-                    )
-                    .foregroundStyle(Color.zoneBone)
-                    .clipShape(UnevenRoundedRectangle(topLeadingRadius: 5, bottomLeadingRadius: 2, bottomTrailingRadius: 2, topTrailingRadius: 5))
-                    .opacity(selected == nil || selected == item.day ? 1 : 0.35)
-                }
+        let top = max(1, (items.map(\.time).max() ?? 0) / 3600) * 1.3
+        let radius: CGFloat = kind == .week ? 5 : 3
+        Chart {
+            ForEach(items, id: \.day) { item in
+                BarMark(
+                    x: .value("Time", item.day, unit: kind.unit),
+                    y: .value("Hours", item.time / 3600)
+                )
+                .foregroundStyle(Color.zoneBone)
+                .clipShape(UnevenRoundedRectangle(topLeadingRadius: radius, bottomLeadingRadius: 1, bottomTrailingRadius: 1, topTrailingRadius: radius))
+                .opacity(selected == nil || selected == item.day ? 1 : 0.35)
+            }
+            if kind == .week {
                 RuleMark(y: .value("Average", average / 3600))
                     .foregroundStyle(Color.zoneBone.opacity(0.5))
                     .lineStyle(StrokeStyle(lineWidth: 1.5, dash: [3, 3]))
             }
-            .chartYScale(domain: 0...top)
-            .chartYAxis(.hidden)
-            .chartXAxis {
-                AxisMarks(values: .stride(by: .day)) {
-                    AxisValueLabel(format: .dateTime.weekday(.narrow), centered: true)
-                        .foregroundStyle(Color.zoneMute)
-                }
-            }
-            .chartOverlay { proxy in
-                GeometryReader { geo in
-                    Rectangle()
-                        .fill(.clear)
-                        .contentShape(.rect)
-                        .onTapGesture { location in
-                            guard let plot = proxy.plotFrame else { return }
-                            let x = location.x - geo[plot].origin.x
-                            guard let date: Date = proxy.value(atX: x) else { return }
-                            let day = Calendar.current.startOfDay(for: date)
-                            guard days.contains(where: { $0.day == day }) else { return }
-                            withAnimation(bubbleAnimation) { selected = selected == day ? nil : day }
-                        }
-                    if let selected, let item = days.first(where: { $0.day == selected }), let plot = proxy.plotFrame,
-                       let x = proxy.position(forX: selected.addingTimeInterval(12 * 3600)),
-                       let y = proxy.position(forY: item.time / 3600) {
-                        let frame = geo[plot]
-                        // A point on top of the bar. The bubble sits above it and stays inside the chart.
-                        Color.clear
-                            .frame(width: 0, height: 0)
-                            .overlay(alignment: .bottom) {
-                                Bubble(day: item.day, time: item.time)
-                                    .padding(.bottom, 6)
-                            }
-                            .offset(x: frame.minX + min(max(x, 48), frame.width - 48), y: frame.minY + y)
-                            .bubbleTransition(reduceMotion: reduceMotion)
-                    }
-                }
-            }
-            .frame(maxHeight: .infinity)
-            .padding(.top, 24)
-            .padding(.bottom, 8)
         }
+        .chartYScale(domain: 0...top)
+        .chartYAxis(.hidden)
+        .chartXAxis { xAxis }
+        .chartOverlay { proxy in
+            GeometryReader { geo in
+                Rectangle()
+                    .fill(.clear)
+                    .contentShape(.rect)
+                    .onTapGesture { location in
+                        guard let plot = proxy.plotFrame else { return }
+                        let x = location.x - geo[plot].origin.x
+                        guard let date: Date = proxy.value(atX: x),
+                              let start = Calendar.current.dateInterval(of: kind.unit, for: date)?.start,
+                              let item = items.first(where: { $0.day == start }),
+                              // An hour with no time has no bar to point at.
+                              kind != .hours || item.time > 0
+                        else { return }
+                        withAnimation(bubbleAnimation) { selected = selected == start ? nil : start }
+                    }
+                if let selected, let item = items.first(where: { $0.day == selected }), let plot = proxy.plotFrame,
+                   let x = proxy.position(forX: selected.addingTimeInterval(kind.half)),
+                   let y = proxy.position(forY: item.time / 3600) {
+                    let frame = geo[plot]
+                    // A point on top of the bar. The bubble sits above it and stays inside the chart.
+                    Color.clear
+                        .frame(width: 0, height: 0)
+                        .overlay(alignment: .bottom) {
+                            Bubble(time: item.time, label: kind.label(item.day))
+                                .padding(.bottom, 6)
+                        }
+                        .offset(x: frame.minX + min(max(x, 48), frame.width - 48), y: frame.minY + y)
+                        .bubbleTransition(reduceMotion: reduceMotion)
+                }
+            }
+        }
+        .frame(height: 150)
+        .padding(.top, 24)
+        .padding(.bottom, 16)
         .hidesSelection($selected)
+    }
+
+    @AxisContentBuilder private var xAxis: some AxisContent {
+        switch kind {
+        case .hours:
+            AxisMarks(values: .stride(by: .hour, count: 6)) {
+                AxisValueLabel(format: .dateTime.hour())
+                    .foregroundStyle(Color.zoneMute)
+            }
+        case .week:
+            AxisMarks(values: .stride(by: .day)) {
+                AxisValueLabel(format: .dateTime.weekday(.narrow), centered: true)
+                    .foregroundStyle(Color.zoneMute)
+            }
+        case .month:
+            AxisMarks(values: .stride(by: .day, count: 7)) {
+                AxisValueLabel(format: .dateTime.day(), centered: true)
+                    .foregroundStyle(Color.zoneMute)
+            }
+        }
     }
 }
