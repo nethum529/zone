@@ -8,7 +8,9 @@ final class ZoneMonitor: DeviceActivityMonitor {
         if ZoneScheduleRuntime.scheduleID(for: activity) != nil {
             ZoneScheduleRuntime.reconcile()
             WidgetCenter.shared.reloadAllTimelines()
+            return
         }
+        relockIfDue(activity)
     }
 
     override func intervalDidEnd(for activity: DeviceActivityName) {
@@ -18,8 +20,15 @@ final class ZoneMonitor: DeviceActivityMonitor {
             WidgetCenter.shared.reloadAllTimelines()
             return
         }
+        relockIfDue(activity)
+    }
+
+    // The relock activity starts at the relock time. Its end is a second chance.
+    // A callback more than a minute before the relock time does not lock.
+    private func relockIfDue(_ activity: DeviceActivityName) {
         guard activity == ZoneLock.relockActivity,
-              ZoneLock.defaults.object(forKey: ZoneLock.Keys.relockAt) != nil
+              let relockAt = ZoneLock.defaults.object(forKey: ZoneLock.Keys.relockAt) as? Date,
+              relockAt.timeIntervalSinceNow < 60
         else { return }
         ZoneLock.lock()
     }
