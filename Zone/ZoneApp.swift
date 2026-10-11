@@ -2,9 +2,12 @@ import SwiftUI
 
 @main
 struct ZoneApp: App {
-    @State private var store = ZoneStore()
+    @State private var store: ZoneStore
 
     init() {
+        let store = ZoneStore()
+        _store = State(initialValue: store)
+        ZoneReminder.shared.start(store: store)
         // Alert text fields ignore the SwiftUI tint, so set the cursor color here.
         UITextField.appearance(whenContainedInInstancesOf: [UIAlertController.self]).tintColor = UIColor(Color.zoneInk)
     }

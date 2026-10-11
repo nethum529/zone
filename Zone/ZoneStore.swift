@@ -23,6 +23,10 @@ final class ZoneStore {
             if !superZone {
                 cancelRelock()
                 refresh()
+                // Out of the Zone, nothing locks again now, so remind the user.
+                if !isZoned { Task { await ZoneReminder.shared.schedule() } }
+            } else {
+                ZoneLock.removeReminder()
             }
         }
     }
@@ -140,6 +144,8 @@ final class ZoneStore {
         ZoneLock.unlock(in: defaults)
         if superZone && allowRelock {
             scheduleRelock()
+        } else if !superZone {
+            Task { await ZoneReminder.shared.schedule() }
         }
         refresh()
     }
