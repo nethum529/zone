@@ -38,11 +38,7 @@ final class ZoneStore {
     // In the Zone, the current profile cannot change.
     // While Zone waits to lock again, a new choice is the profile the relock uses.
     var isLocked: Bool { isZoned }
-    var hasBlockedItems: Bool {
-        !selection.applicationTokens.isEmpty
-            || !selection.categoryTokens.isEmpty
-            || !selection.webDomainTokens.isEmpty
-    }
+    var hasBlockedItems: Bool { profiles.current.blocksSomething }
 
     private typealias Keys = ZoneLock.Keys
     private let defaults: UserDefaults

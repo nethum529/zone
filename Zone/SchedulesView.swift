@@ -108,10 +108,7 @@ struct SchedulesView: View {
         if zone.registeredTagID == nil { return "Register your tag on Home to use schedules." }
         let profiles = enabled.compactMap { $0.profile(in: zone.profiles) }
         if profiles.count != enabled.count { return "Choose a profile for each schedule." }
-        if profiles.contains(where: {
-            $0.selection.applicationTokens.isEmpty && $0.selection.categoryTokens.isEmpty
-                && $0.selection.webDomainTokens.isEmpty
-        }) { return "Choose blocked apps in Profiles to use schedules." }
+        if profiles.contains(where: { !$0.blocksSomething }) { return "Choose blocked apps in Profiles to use schedules." }
         return nil
     }
 

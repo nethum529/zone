@@ -7,6 +7,36 @@ struct ZoneProfile: Codable, Identifiable, Equatable {
     let id: UUID
     var name: String
     var selection = FamilyActivitySelection()
+    // Sites typed by address, for example instagram.com. The web filter blocks them in Safari and other browsers.
+    var sites: [String] = []
+
+    var blocksSomething: Bool {
+        !selection.applicationTokens.isEmpty || !selection.categoryTokens.isEmpty
+            || !selection.webDomainTokens.isEmpty || !sites.isEmpty
+    }
+
+    // The web filter takes at most 50 sites.
+    static let maxSites = 50
+
+    // "https://www.Instagram.com/explore" becomes "instagram.com". Returns nil when the text is not a site.
+    static func site(from text: String) -> String? {
+        let text = text.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let url = URL(string: text.contains("://") ? text : "https://" + text)
+        guard var host = url?.host(), host.contains("."), !host.hasPrefix("."), !host.hasSuffix(".") else { return nil }
+        if host.hasPrefix("www.") { host.removeFirst(4) }
+        return host
+    }
+}
+
+extension ZoneProfile {
+    // Profiles saved before sites existed have no sites key.
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        name = try container.decode(String.self, forKey: .name)
+        selection = try container.decode(FamilyActivitySelection.self, forKey: .selection)
+        sites = try container.decodeIfPresent([String].self, forKey: .sites) ?? []
+    }
 }
 
 // All profiles and the current one. There is always at least one profile.
@@ -57,6 +87,22 @@ struct ZoneProfiles: Codable, Equatable {
     mutating func setSelection(_ selection: FamilyActivitySelection, for id: ZoneProfile.ID) {
         guard let index = all.firstIndex(where: { $0.id == id }) else { return }
         all[index].selection = selection
+    }
+
+    // Returns false when the text is not a site or the list is full. A site already in the list is not added again.
+    @discardableResult
+    mutating func addSite(_ text: String, to id: ZoneProfile.ID) -> Bool {
+        guard let site = ZoneProfile.site(from: text),
+              let index = all.firstIndex(where: { $0.id == id }),
+              all[index].sites.count < ZoneProfile.maxSites
+        else { return false }
+        if !all[index].sites.contains(site) { all[index].sites.append(site) }
+        return true
+    }
+
+    mutating func removeSite(_ site: String, from id: ZoneProfile.ID) {
+        guard let index = all.firstIndex(where: { $0.id == id }) else { return }
+        all[index].sites.removeAll { $0 == site }
     }
 
     // The last profile is kept. If the current profile goes, the first one left becomes current.
