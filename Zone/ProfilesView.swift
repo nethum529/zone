@@ -44,6 +44,8 @@ struct ProfilesView: View {
                 .padding(24)
                 .undoLine($pending, text: { "\($0.name) deleted" }, commit: commit)
             }
+            // Only while the list shows, not under a profile page.
+            .swipeHint("profiles", row: path.isEmpty ? visible.first.flatMap { canSwipeDelete($0.id) ? $0.id : nil } : nil)
             .profilePage()
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
