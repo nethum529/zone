@@ -3,6 +3,7 @@ import Darwin
 import FamilyControls
 import Foundation
 import ManagedSettings
+import UserNotifications
 
 // The lock state and the shields. The app and the monitor extension both use this.
 // The state is in the App Group, so the extension can lock again when the app is not running.
@@ -64,6 +65,16 @@ enum ZoneLock {
         shields.webContent.blockedByFilter = sites.isEmpty ? nil : .specific(sites)
         defaults.set(now, forKey: Keys.zonedSince)
         defaults.removeObject(forKey: Keys.relockAt)
+        removeReminder()
+    }
+
+    // The app's reminder to enter the Zone again. See Zone/ZoneReminder.swift.
+    static let reminderID = "reminder"
+
+    static func removeReminder() {
+        let center = UNUserNotificationCenter.current()
+        center.removePendingNotificationRequests(withIdentifiers: [reminderID])
+        center.removeDeliveredNotifications(withIdentifiers: [reminderID])
     }
 
     @discardableResult
