@@ -30,9 +30,11 @@ struct AnalyticsView: View {
     private func page(_ stats: ZoneStats) -> some View {
         let week = stats.lastWeek
         let lengths = stats.weekSessions.map(\.duration)
+        let averageSession = zoneTimeText(lengths.isEmpty ? 0 : lengths.reduce(0, +) / Double(lengths.count))
+        let longestSession = zoneTimeText(lengths.max() ?? 0)
         let change = changeText(week, from: stats.weekBefore).map { ", \($0.lowercased()) from the 7 before" } ?? ""
         return VStack(spacing: 0) {
-            Readout(value: zoneTimeText(week), detail: "Last 7 days\(change)")
+            Readout(value: zoneTimeText(week), detail: "Time in the Zone, last 7 days\(change)")
             VStack(spacing: 0) {
                 section(.hours, "Today", value: zoneTimeText(stats.today), stats: stats)
                 section(.week, "Average a day", value: zoneTimeText(week / 7), stats: stats)
@@ -40,8 +42,14 @@ struct AnalyticsView: View {
             }
             .buttonStyle(ZoneRowStyle())
             .padding(.bottom, 20)
-            ZoneRow("Average session", value: zoneTimeText(lengths.isEmpty ? 0 : lengths.reduce(0, +) / Double(lengths.count))) { EmptyView() }
-            ZoneRow("Longest session", value: zoneTimeText(lengths.max() ?? 0)) { EmptyView() }
+            ZoneRow("Average session", value: averageSession) { EmptyView() }
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("Average session, time in the Zone")
+                .accessibilityValue(averageSession)
+            ZoneRow("Longest session", value: longestSession) { EmptyView() }
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("Longest session, time in the Zone")
+                .accessibilityValue(longestSession)
         }
     }
 
@@ -59,7 +67,8 @@ struct AnalyticsView: View {
                     ZoneCaret().rotationEffect(.degrees(isOpen ? 90 : 0))
                 }
             }
-            .accessibilityValue(isOpen ? "Chart shown" : "")
+            .accessibilityLabel("\(label), time in the Zone")
+            .accessibilityValue("\(value)\(note.map { ", \($0)" } ?? "")\(isOpen ? ", chart shown" : "")")
             // The chart slides down from under the row, inside the space that opens.
             VStack(spacing: 0) {
                 if isOpen {
@@ -121,7 +130,8 @@ private struct Readout: View {
                 .foregroundStyle(Color.zoneMute)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .frame(height: 84, alignment: .top)
+        .frame(minHeight: 84, alignment: .top)
+        .accessibilityElement(children: .combine)
     }
 }
 
@@ -179,18 +189,23 @@ private struct Bars: View {
             ForEach(items, id: \.day) { item in
                 BarMark(
                     x: .value("Time", item.day, unit: kind.unit),
-                    y: .value("Hours", item.time / 3600)
+                    y: .value("Time in the Zone (hours)", item.time / 3600)
                 )
                 .foregroundStyle(Color.zoneBone)
                 .clipShape(UnevenRoundedRectangle(topLeadingRadius: radius, bottomLeadingRadius: 1, bottomTrailingRadius: 1, topTrailingRadius: radius))
                 .opacity(selected == nil || selected == item.day ? 1 : 0.35)
+                .accessibilityLabel("\(kind.label(item.day)), time in the Zone")
+                .accessibilityValue(zoneTimeText(item.time))
             }
             if kind == .week {
                 RuleMark(y: .value("Average", average / 3600))
                     .foregroundStyle(Color.zoneBone.opacity(0.5))
                     .lineStyle(StrokeStyle(lineWidth: 1.5, dash: [3, 3]))
+                    .accessibilityLabel("Average a day, time in the Zone")
+                    .accessibilityValue(zoneTimeText(average))
             }
         }
+        .chartXScale(range: .plotDimension(padding: 16))
         .chartYScale(domain: 0...top)
         .chartYAxis(.hidden)
         .chartXAxis { xAxis }
@@ -230,25 +245,31 @@ private struct Bars: View {
         .padding(.top, 24)
         .padding(.bottom, 16)
         .hidesSelection($selected)
+        .accessibilityLabel("Time in the Zone")
+    }
+
+    private var axisDates: [Date] {
+        let step = switch kind {
+        case .hours: 6
+        case .week: 1
+        case .month: 7
+        }
+        return stride(from: 0, to: items.count, by: step).map { items[$0].day.addingTimeInterval(kind.half) }
     }
 
     @AxisContentBuilder private var xAxis: some AxisContent {
-        switch kind {
-        case .hours:
-            AxisMarks(values: .stride(by: .hour, count: 6)) {
-                AxisValueLabel(format: .dateTime.hour())
-                    .foregroundStyle(Color.zoneMute)
+        // Align labels with the bar centers, rather than with the gaps between labels.
+        AxisMarks(preset: .aligned, values: axisDates) { value in
+            AxisValueLabel(centered: false, anchor: .top, horizontalSpacing: 0) {
+                if let date = value.as(Date.self) {
+                    switch kind {
+                    case .hours: Text(date, format: .dateTime.hour())
+                    case .week: Text(date, format: .dateTime.weekday(.narrow))
+                    case .month: Text(date, format: .dateTime.day())
+                    }
+                }
             }
-        case .week:
-            AxisMarks(values: .stride(by: .day)) {
-                AxisValueLabel(format: .dateTime.weekday(.narrow), centered: true)
-                    .foregroundStyle(Color.zoneMute)
-            }
-        case .month:
-            AxisMarks(values: .stride(by: .day, count: 7)) {
-                AxisValueLabel(format: .dateTime.day(), centered: true)
-                    .foregroundStyle(Color.zoneMute)
-            }
+            .foregroundStyle(Color.zoneMute)
         }
     }
 }
