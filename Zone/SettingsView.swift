@@ -6,6 +6,10 @@ struct SettingsView: View {
     @State private var showingProfiles = false
     @State private var showingSchedules = false
     @State private var showingSuperZone = false
+    #if DEBUG
+    @State private var confirmingReplay = false
+    @State private var replayError: String?
+    #endif
 
     var body: some View {
         VStack(spacing: 0) {
@@ -27,6 +31,19 @@ struct SettingsView: View {
                     EmergencyUnlockSettingsRow { remaining in
                         row("Emergency unlock", value: "\(remaining)")
                     }
+                    #if DEBUG
+                    Button { confirmingReplay = true } label: {
+                        row("Replay setup", value: "")
+                    }
+                    .disabled(store.isZoned || store.isRequestingAuthorization)
+                    if store.isZoned {
+                        Text("Leave the Zone to replay setup.")
+                            .font(.zone(size: 15))
+                            .foregroundStyle(Color.zoneMute)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.bottom, 8)
+                    }
+                    #endif
                 }
                 .buttonStyle(ZoneRowStyle())
                 .padding(.horizontal, 24)
@@ -39,6 +56,26 @@ struct SettingsView: View {
         .sheet(isPresented: $showingTags) { ZoneTagsView(tags: store.tags) }
         .sheet(isPresented: $showingSchedules) { SchedulesView() }
         .sheet(isPresented: $showingSuperZone) { SuperZoneView() }
+        #if DEBUG
+        .confirmationDialog("Replay setup?", isPresented: $confirmingReplay, titleVisibility: .visible) {
+            Button("Replay setup") {
+                Task {
+                    do { try await store.replaySetup() }
+                    catch { replayError = error.localizedDescription }
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Keep your data. Allow Screen Time and choose apps again.")
+        }
+        .alert("Could not replay setup", isPresented: Binding(
+            get: { replayError != nil }, set: { if !$0 { replayError = nil } }
+        )) {
+            Button("OK", role: .cancel) { replayError = nil }
+        } message: {
+            Text(replayError ?? "")
+        }
+        #endif
     }
 
     // One list, one row: label and value in ink at one size, no gaps or lines.

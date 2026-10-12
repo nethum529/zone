@@ -40,6 +40,9 @@ enum ZoneScheduleRuntime {
 
     static func reconcile(at now: Date = .now, in defaults: UserDefaults = ZoneLock.defaults) {
         ZoneLock.withStateLock {
+            #if DEBUG
+            guard !defaults.bool(forKey: ZoneLock.Keys.replaySetup) else { return }
+            #endif
             reconcile(at: now, defaults: defaults, canEnter: { profile in
                 !ZoneTag.load(from: defaults).isEmpty && profile.blocksSomething
             },

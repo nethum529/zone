@@ -8,7 +8,7 @@ struct ContentView: View {
     var body: some View {
         Group {
             // The first run ends with the tag scan.
-            if store.hasScreenTimeAccess && store.hasTag {
+            if showsMain {
                 MainView()
             } else {
                 OnboardingView()
@@ -19,6 +19,13 @@ struct ContentView: View {
         .preferredColorScheme(.dark)
         .task { await store.watchAuthorization() }
         .syncsLockScreen(zonedSince: store.zonedSince)
+    }
+
+    private var showsMain: Bool {
+        #if DEBUG
+        if store.isReplayingSetup { return false }
+        #endif
+        return store.hasScreenTimeAccess && store.hasTag
     }
 }
 

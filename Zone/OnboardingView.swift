@@ -10,11 +10,14 @@ struct OnboardingView: View {
     @State private var picking = false
     // The name from the name step. The scan saves the tag with it.
     @State private var tagName: String?
+    #if DEBUG
+    @State private var replaySelection = FamilyActivitySelection()
+    @State private var replayPickerProfileID: UUID?
+    #endif
 
     private enum Step { case profile, tagName, scan }
 
     var body: some View {
-        @Bindable var store = store
         NavigationStack {
             Group {
                 if !store.hasScreenTimeAccess {
@@ -34,7 +37,16 @@ struct OnboardingView: View {
             .navigationBarTitleDisplayMode(.inline)
         }
         .tint(Color.zoneBone)
-        .familyActivityPicker(isPresented: $picking, selection: $store.selection)
+        .familyActivityPicker(isPresented: $picking, selection: pickerSelection)
+        #if DEBUG
+        .onChange(of: picking) { _, shown in
+            if !shown, let id = replayPickerProfileID {
+                store.renewReplaySelection(replaySelection, for: id)
+                replayPickerProfileID = nil
+                replaySelection = FamilyActivitySelection()
+            }
+        }
+        #endif
         .tagScanAlert(scanner)
     }
 
@@ -53,19 +65,54 @@ struct OnboardingView: View {
     }
 
     // The default profile blocks social apps. iOS only lets the user choose apps, so the list opens with a hint.
-    private var profile: some View {
-        page("Your first profile", "Start with your social apps. In the list, tap the circle next to Social, then the check.") {
+    @ViewBuilder private var profile: some View {
+        #if DEBUG
+        if let saved = store.replayProfile {
+            page(saved.name, "Screen Time cleared app access. Choose this profile's apps again.") {
+                Button("Choose apps", action: openPicker)
+                    .disabled(store.isRequestingAuthorization)
+            } rows: {
+                Button(action: openPicker) {
+                    ZoneRow("Blocked apps", value: appsText(saved.selection))
+                }
+                .buttonStyle(ZoneRowStyle())
+                .disabled(store.isRequestingAuthorization)
+            }
+        } else {
+            firstProfile
+        }
+        #else
+        firstProfile
+        #endif
+    }
+
+    private var firstProfile: some View {
+        page(profileTitle, profileHint) {
             Button(store.isRequestingAuthorization ? "Waiting for Screen Time..." : (store.hasBlockedItems ? "Next" : "Choose apps")) {
-                if store.hasBlockedItems { go(to: .tagName) } else { picking = true }
+                if store.hasBlockedItems { go(to: .tagName) } else { openPicker() }
             }
             .disabled(store.isRequestingAuthorization)
         } rows: {
-            Button { picking = true } label: {
+            Button(action: openPicker) {
                 ZoneRow("Blocked apps", value: appsText(store.selection))
             }
             .buttonStyle(ZoneRowStyle())
             .disabled(store.isRequestingAuthorization)
         }
+    }
+
+    private var profileTitle: String {
+        #if DEBUG
+        if store.isReplayingSetup { return store.profiles.current.name }
+        #endif
+        return "Your first profile"
+    }
+
+    private var profileHint: String {
+        #if DEBUG
+        if store.isReplayingSetup { return "Your saved profile is ready. Continue to your tag." }
+        #endif
+        return "Start with your social apps. In the list, tap the circle next to Social, then the check."
     }
 
     private var scan: some View {
@@ -80,10 +127,31 @@ struct OnboardingView: View {
         guard let id = await scanner.scan() else { return }
         do {
             try store.registerTag(id, name: tagName)
+            #if DEBUG
+            if store.isReplayingSetup {
+                try store.finishReplay()
+                return
+            }
+            #endif
             store.enterZone()
         } catch {
             scanner.errorMessage = error.localizedDescription
         }
+    }
+
+    private var pickerSelection: Binding<FamilyActivitySelection> {
+        #if DEBUG
+        if replayPickerProfileID != nil { return $replaySelection }
+        #endif
+        return Binding(get: { store.selection }, set: { store.selection = $0 })
+    }
+
+    private func openPicker() {
+        #if DEBUG
+        replayPickerProfileID = store.replayProfile?.id
+        replaySelection = FamilyActivitySelection()
+        #endif
+        picking = true
     }
 
     private func go(to next: Step) {

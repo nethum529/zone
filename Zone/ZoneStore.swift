@@ -63,6 +63,14 @@ final class ZoneStore {
     private let defaults: UserDefaults
     private let activityCenter = DeviceActivityCenter()
     private var requestedAuthorization = false
+    #if DEBUG
+    private(set) var isReplayingSetup: Bool
+    private(set) var replayProfileIDs: [UUID]
+
+    var replayProfile: ZoneProfile? {
+        replayProfileIDs.first.flatMap { profiles.profile($0) }
+    }
+    #endif
 
     init(defaults: UserDefaults = ZoneLock.defaults) {
         self.defaults = defaults
@@ -70,6 +78,10 @@ final class ZoneStore {
         superZone = defaults.bool(forKey: Keys.superZone)
         relockMinutes = defaults.object(forKey: Keys.relockMinutes) as? Int ?? 15
         profiles = ZoneProfiles.load(from: defaults)
+        #if DEBUG
+        isReplayingSetup = defaults.bool(forKey: Keys.replaySetup)
+        replayProfileIDs = (defaults.stringArray(forKey: Keys.replayProfileIDs) ?? []).compactMap(UUID.init(uuidString:))
+        #endif
         sessions = defaults.data(forKey: Keys.sessions)
             .flatMap { try? JSONDecoder().decode([ZoneSession].self, from: $0) } ?? []
         refresh()
@@ -124,8 +136,102 @@ final class ZoneStore {
     }
 
     func registerTag(_ id: String, name: String?) throws {
+        #if DEBUG
+        if isReplayingSetup, tags.contains(id) {
+            if let name { tags.rename(id, to: name) }
+            return
+        }
+        #endif
         try tags.add(id, name: name)
     }
+
+    #if DEBUG
+    func replaySetup() async throws {
+        guard !isRequestingAuthorization else { return }
+        refresh()
+        let wasWaitingToRelock = relockAt != nil
+        let started = ZoneLock.withStateLock {
+            guard defaults.object(forKey: Keys.zonedSince) == nil else { return false }
+            // Revoking access voids every app token, including those in other profiles.
+            let saved = ZoneProfiles.load(from: defaults)
+            replayProfileIDs = ([saved.current] + saved.all.filter { $0.id != saved.currentID })
+                .filter { $0.selection != FamilyActivitySelection() }.map(\.id)
+            defaults.set(replayProfileIDs.map(\.uuidString), forKey: Keys.replayProfileIDs)
+            defaults.set(true, forKey: Keys.replaySetup)
+            return true
+        }
+        guard started else { throw ScheduleError(message: "Leave the Zone to replay setup.") }
+        isRequestingAuthorization = true
+        isReplayingSetup = true
+        authorization = .notDetermined
+        activityCenter.stopMonitoring()
+        cancelRelock()
+        ZoneLock.shields.clearAllSettings()
+        ZoneLock.removeReminder()
+        defer { isRequestingAuthorization = false }
+        do {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in
+                AuthorizationCenter.shared.revokeAuthorization { @Sendable result in
+                    continuation.resume(with: result)
+                }
+            }
+            authorization = AuthorizationCenter.shared.authorizationStatus
+            guard authorization != .approved else {
+                throw ScheduleError(message: "Screen Time access is still allowed. Try again.")
+            }
+            requestedAuthorization = false
+            authorizationError = nil
+        } catch {
+            authorization = AuthorizationCenter.shared.authorizationStatus
+            if authorization == .approved {
+                replayProfileIDs = []
+                defaults.removeObject(forKey: Keys.replayProfileIDs)
+                do {
+                    try restoreReplayMonitoring()
+                    if superZone, wasWaitingToRelock { scheduleRelock() }
+                    refresh()
+                } catch {
+                    authorizationError = "Could not restore schedules. Allow Screen Time access to try again."
+                }
+            } else {
+                authorizationError = "Could not replay setup. Allow Screen Time access to continue."
+            }
+            throw error
+        }
+    }
+
+    func renewReplaySelection(_ selection: FamilyActivitySelection, for id: UUID) {
+        guard replayProfileIDs.contains(id), selection != FamilyActivitySelection() else { return }
+        ZoneLock.withStateLock {
+            profiles.setSelection(selection, for: id)
+            replayProfileIDs.removeAll { $0 == id }
+            defaults.set(replayProfileIDs.map(\.uuidString), forKey: Keys.replayProfileIDs)
+        }
+    }
+
+    func finishReplay() throws {
+        guard hasScreenTimeAccess, replayProfileIDs.isEmpty else {
+            throw ScheduleError(message: "Choose apps again before you continue.")
+        }
+        try restoreReplayMonitoring()
+        enterZone()
+    }
+
+    private func restoreReplayMonitoring() throws {
+        // Keep callbacks paused until every saved monitor has been restored.
+        for schedule in ZoneScheduleRuntime.schedules(in: defaults) where schedule.isEnabled {
+            try activityCenter.startMonitoring(
+                ZoneScheduleRuntime.activity(for: schedule.id),
+                during: ZoneScheduleRuntime.deviceSchedule(for: schedule)
+            )
+        }
+        ZoneLock.withStateLock {
+            defaults.removeObject(forKey: Keys.replaySetup)
+            defaults.removeObject(forKey: Keys.replayProfileIDs)
+        }
+        isReplayingSetup = false
+    }
+    #endif
 
     func isRegisteredTag(_ id: String) -> Bool {
         tags.contains(id)
