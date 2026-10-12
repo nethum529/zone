@@ -47,7 +47,7 @@ targets:
         INFOPLIST_KEY_UIRequiresFullScreen: YES
         INFOPLIST_KEY_ITSAppUsesNonExemptEncryption: NO
         MARKETING_VERSION: "0.1"
-        CURRENT_PROJECT_VERSION: "5"
+        CURRENT_PROJECT_VERSION: "6"
   ZoneMonitor:
     type: app-extension
     platform: iOS
@@ -70,7 +70,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.nethum.zone.monitor
         MARKETING_VERSION: "0.1"
-        CURRENT_PROJECT_VERSION: "5"
+        CURRENT_PROJECT_VERSION: "6"
   ZoneShield:
     type: app-extension
     platform: iOS
@@ -93,7 +93,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.nethum.zone.shield
         MARKETING_VERSION: "0.1"
-        CURRENT_PROJECT_VERSION: "5"
+        CURRENT_PROJECT_VERSION: "6"
   ZoneShieldAction:
     type: app-extension
     platform: iOS
@@ -116,7 +116,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.nethum.zone.shieldaction
         MARKETING_VERSION: "0.1"
-        CURRENT_PROJECT_VERSION: "5"
+        CURRENT_PROJECT_VERSION: "6"
   ZoneWidget:
     type: app-extension
     platform: iOS
@@ -144,7 +144,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.nethum.zone.widget
         MARKETING_VERSION: "0.1"
-        CURRENT_PROJECT_VERSION: "5"
+        CURRENT_PROJECT_VERSION: "6"
   ZoneTests:
     type: bundle.unit-test
     platform: iOS
