@@ -17,7 +17,7 @@ struct OnboardingView: View {
         @Bindable var store = store
         NavigationStack {
             Group {
-                if store.authorization != .approved {
+                if !store.hasScreenTimeAccess {
                     access
                 } else {
                     switch step {
@@ -40,8 +40,14 @@ struct OnboardingView: View {
 
     private var access: some View {
         page("Zone", "Zone blocks the apps you choose until you scan your tag again. It needs Screen Time access to do this.") {
-            Button("Allow Screen Time access") {
+            Button(store.isRequestingAuthorization ? "Waiting for Screen Time..." : "Allow Screen Time access") {
                 Task { await store.requestAuthorization() }
+            }
+            .disabled(store.isRequestingAuthorization)
+        } rows: {
+            if let error = store.authorizationError {
+                Text(error)
+                    .foregroundStyle(Color.zoneMute)
             }
         }
     }
@@ -49,14 +55,16 @@ struct OnboardingView: View {
     // The default profile blocks social apps. iOS only lets the user choose apps, so the list opens with a hint.
     private var profile: some View {
         page("Your first profile", "Start with your social apps. In the list, tap the circle next to Social, then the check.") {
-            Button(store.hasBlockedItems ? "Next" : "Choose apps") {
+            Button(store.isRequestingAuthorization ? "Waiting for Screen Time..." : (store.hasBlockedItems ? "Next" : "Choose apps")) {
                 if store.hasBlockedItems { go(to: .tagName) } else { picking = true }
             }
+            .disabled(store.isRequestingAuthorization)
         } rows: {
             Button { picking = true } label: {
                 ZoneRow("Blocked apps", value: appsText(store.selection))
             }
             .buttonStyle(ZoneRowStyle())
+            .disabled(store.isRequestingAuthorization)
         }
     }
 

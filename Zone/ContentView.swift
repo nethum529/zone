@@ -8,7 +8,7 @@ struct ContentView: View {
     var body: some View {
         Group {
             // The first run ends with the tag scan.
-            if store.authorization == .approved && store.hasTag {
+            if store.hasScreenTimeAccess && store.hasTag {
                 MainView()
             } else {
                 OnboardingView()
