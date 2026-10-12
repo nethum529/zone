@@ -1,43 +1,67 @@
 import FamilyControls
 import SwiftUI
 
-// The first run: Screen Time access, the first profile, the tag name, then one scan.
-// The scan saves the tag and starts the first Zone.
+// Test the tag before setup. Only the final scan saves it and starts a Zone.
 struct OnboardingView: View {
     @Environment(ZoneStore.self) private var store
-    @State private var step = Step.profile
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var step = Step.ready
     @State private var scanner = TagScanner()
+    @State private var scanning = false
     @State private var picking = false
-    // The name from the name step. The scan saves the tag with it.
-    @State private var tagName: String?
+    @State private var firstRead: String?
+    @State private var testedID: String?
+    @State private var tagName = ""
+    @State private var showingTagHelp = false
+    @State private var scanError: String?
     #if DEBUG
     @State private var replaySelection = FamilyActivitySelection()
     @State private var replayPickerProfileID: UUID?
     #endif
 
-    private enum Step { case profile, tagName, scan }
+    private enum Step { case ready, test, verified, failed(TestFailure), purchase, access, profile, scan }
+    private enum TestFailure { case unreadable, mismatch }
+    private let amazonTags = URL(string: "https://www.amazon.com/s?k=NTAG215+NFC+tags")!
 
     var body: some View {
         NavigationStack {
-            Group {
-                if !store.hasScreenTimeAccess {
-                    access
-                } else {
-                    switch step {
-                    case .profile: profile
-                    case .tagName: TagNameForm(name: tagName) { tagName = $0 } done: { go(to: .scan) }
-                    case .scan: scan
-                    }
+            ZStack(alignment: .topLeading) {
+                switch step {
+                case .ready: ready
+                case .test: cardTest
+                case .verified: verified
+                case .failed(let reason): failed(reason)
+                case .purchase: purchase
+                case .access: access
+                case .profile:
+                    if store.hasScreenTimeAccess { profile } else { access }
+                case .scan:
+                    if store.hasScreenTimeAccess { scan } else { access }
                 }
             }
             .transition(.opacity)
-            // Keep the bar on every step, so the title does not move when Skip shows.
             .toolbarVisibility(.visible, for: .navigationBar)
             .toolbarBackground(Color.zoneBackground, for: .navigationBar)
             .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    switch step {
+                    case .test, .verified, .failed, .purchase:
+                        Button("Back") { clearTest(); go(to: .ready) }
+                            .disabled(scanning)
+                    case .scan:
+                        Button("Back") { go(to: .profile) }
+                            .disabled(scanning)
+                    default: EmptyView()
+                    }
+                }
+            }
         }
         .tint(Color.zoneBone)
         .familyActivityPicker(isPresented: $picking, selection: pickerSelection)
+        .onChange(of: store.hasScreenTimeAccess) { _, allowed in
+            if allowed, case .access = step { go(to: .profile) }
+        }
         #if DEBUG
         .onChange(of: picking) { _, shown in
             if !shown, let id = replayPickerProfileID {
@@ -48,23 +72,103 @@ struct OnboardingView: View {
         }
         #endif
         .tagScanAlert(scanner)
+        .task(id: scanning) {
+            guard scanning else { return }
+            if case .scan = step { await register() } else { await testCard() }
+            scanning = false
+        }
     }
 
-    private var access: some View {
-        page("Zone", "Zone blocks the apps you choose until you scan your tag again. It needs Screen Time access to do this.") {
-            Button(store.isRequestingAuthorization ? "Waiting for Screen Time..." : "Allow Screen Time access") {
-                Task { await store.requestAuthorization() }
+    private var ready: some View {
+        page("Have a tag?", "Scan a tag to block apps. Scan it again to leave. You may already have one.") {
+            VStack(spacing: 12) {
+                Button("Test my card or tag", action: startTest)
+                secondary("I need a tag") { go(to: .purchase) }
             }
-            .disabled(store.isRequestingAuthorization)
         } rows: {
-            if let error = store.authorizationError {
-                Text(error)
-                    .foregroundStyle(Color.zoneMute)
+            VStack(spacing: 0) {
+                tagExample("NFC sticker or key fob", note: "NTAG213 or NTAG215")
+                tagExample("amiibo figure or card")
+                tagExample("Student or work ID", note: "Some cards work. Test yours.")
+                tagExample("Transit or old hotel card", note: "Some cards work. Test yours.")
             }
         }
     }
 
-    // The default profile blocks social apps. iOS only lets the user choose apps, so the list opens with a hint.
+    private var cardTest: some View {
+        page(firstRead == nil ? "Test your card" : "Scan it again",
+             firstRead == nil
+             ? "Hold one card near the top of your iPhone. This test does not block apps or change the card."
+             : "Move the card away from your iPhone, then scan the same card again.") {
+            Button(firstRead == nil ? "Scan card" : "Scan again") { scanning = true }
+                .disabled(scanning)
+        }
+    }
+
+    private var verified: some View {
+        page("This tag is ready", "Both scans matched. Keep this tag. You will use it to leave a Zone.") {
+            Button("Continue") { go(to: .access) }
+        } rows: {
+            plainRow("Test another card", action: startTest)
+        }
+    }
+
+    private func failed(_ reason: TestFailure) -> some View {
+        page(reason == .mismatch ? "The scans did not match" : "Could not read this card",
+             reason == .mismatch
+             ? "Use the same card for both scans. If it still fails, try another tag."
+             : "Hold one card near the top of your iPhone and try again. Some cards cannot be read.") {
+            Button("Try again", action: startTest)
+        } rows: {
+            VStack(alignment: .leading, spacing: 12) {
+                plainRow("Try another card", action: startTest)
+                note("Need a tag? A 10-pack of NTAG215 tags is about $7 on Amazon, before shipping and tax. Prices can change.")
+                Link(destination: amazonTags) { ZoneRow("Find tags on Amazon", value: "") }
+                    .buttonStyle(ZoneRowStyle())
+            }
+        }
+    }
+
+    private var purchase: some View {
+        page("A tag for about $7", "A 10-pack of NTAG215 tags is $6.99 on Amazon before shipping and tax. Prices can change. You only need one.") {
+            VStack(spacing: 12) {
+                Link("Find tags on Amazon", destination: amazonTags)
+                secondary("I have a tag to test", action: startTest)
+            }
+        } rows: {
+            VStack(alignment: .leading, spacing: 12) {
+                Button { showingTagHelp.toggle() } label: {
+                    ZoneRow("How the tag works", value: showingTagHelp ? "Close" : "Read")
+                }
+                .buttonStyle(ZoneRowStyle())
+                if showingTagHelp {
+                    note("Scan once to start blocking. Scan the same tag again to leave. Zone does not write to the tag.")
+                }
+                note("Choose NTAG213 or NTAG215. No programming is needed.")
+            }
+        }
+    }
+
+    private var access: some View {
+        page("Enable app blocking", "Zone needs Screen Time access to block the apps you choose.") {
+            Button(store.isRequestingAuthorization ? "Waiting for Screen Time..." : "Continue") {
+                if store.hasScreenTimeAccess {
+                    go(to: .profile)
+                } else {
+                    Task {
+                        await store.requestAuthorization()
+                        if store.hasScreenTimeAccess { go(to: .profile) }
+                    }
+                }
+            }
+            .disabled(store.isRequestingAuthorization)
+        } rows: {
+            if let error = store.authorizationError {
+                Text(error).foregroundStyle(Color.zoneMute)
+            }
+        }
+    }
+
     @ViewBuilder private var profile: some View {
         #if DEBUG
         if let saved = store.replayProfile {
@@ -72,11 +176,9 @@ struct OnboardingView: View {
                 Button("Choose apps", action: openPicker)
                     .disabled(store.isRequestingAuthorization)
             } rows: {
-                Button(action: openPicker) {
-                    ZoneRow("Blocked apps", value: appsText(saved.selection))
-                }
-                .buttonStyle(ZoneRowStyle())
-                .disabled(store.isRequestingAuthorization)
+                Button(action: openPicker) { ZoneRow("Blocked apps", value: appsText(saved.selection)) }
+                    .buttonStyle(ZoneRowStyle())
+                    .disabled(store.isRequestingAuthorization)
             }
         } else {
             firstProfile
@@ -87,46 +189,56 @@ struct OnboardingView: View {
     }
 
     private var firstProfile: some View {
-        page(profileTitle, profileHint) {
-            Button(store.isRequestingAuthorization ? "Waiting for Screen Time..." : (store.hasBlockedItems ? "Next" : "Choose apps")) {
-                if store.hasBlockedItems { go(to: .tagName) } else { openPicker() }
+        page("Choose your distractions", "Pick the apps you want to block. Social is a good start.") {
+            Button(store.isRequestingAuthorization ? "Waiting for Screen Time..." : (store.hasBlockedItems ? "Continue" : "Choose apps")) {
+                if store.hasBlockedItems { go(to: .scan) } else { openPicker() }
             }
             .disabled(store.isRequestingAuthorization)
         } rows: {
-            Button(action: openPicker) {
-                ZoneRow("Blocked apps", value: appsText(store.selection))
-            }
-            .buttonStyle(ZoneRowStyle())
-            .disabled(store.isRequestingAuthorization)
+            Button(action: openPicker) { ZoneRow("Blocked apps", value: appsText(store.selection)) }
+                .buttonStyle(ZoneRowStyle())
+                .disabled(store.isRequestingAuthorization)
         }
-    }
-
-    private var profileTitle: String {
-        #if DEBUG
-        if store.isReplayingSetup { return store.profiles.current.name }
-        #endif
-        return "Your first profile"
-    }
-
-    private var profileHint: String {
-        #if DEBUG
-        if store.isReplayingSetup { return "Your saved profile is ready. Continue to your tag." }
-        #endif
-        return "Start with your social apps. In the list, tap the circle next to Social, then the check."
     }
 
     private var scan: some View {
-        page("Scan your tag", "Hold the top of your iPhone near your tag. Your apps are blocked right away. Scan it again to leave.") {
-            Button("Scan tag") {
-                Task { await register() }
-            }
+        page("Scan to start", "Hold the top of your iPhone near the tag you tested. Scanning blocks your chosen apps. Scan again to leave.") {
+            Button("Scan tag") { scanning = true }
+                .disabled(scanning || store.isRequestingAuthorization || !store.hasBlockedItems)
+        } rows: {
+            TagNameForm.Field(name: $tagName, label: "Tag name", placeholder: "Optional")
+            if let scanError { Text(scanError).foregroundStyle(Color.zoneMute) }
         }
     }
 
+    private func testCard() async {
+        scanner.errorMessage = nil
+        guard let id = await scanner.scan(prompt: "Hold the top of your iPhone near one card or tag.", reportTimeout: true) else {
+            if scanner.errorMessage != nil {
+                scanner.errorMessage = nil
+                clearTest()
+                go(to: .failed(.unreadable))
+            }
+            return
+        }
+        guard !Task.isCancelled else { return }
+        guard let firstRead else { self.firstRead = id; return }
+        guard firstRead == id else { clearTest(); go(to: .failed(.mismatch)); return }
+        testedID = id
+        go(to: .verified)
+    }
+
     private func register() async {
-        guard let id = await scanner.scan() else { return }
+        guard store.hasScreenTimeAccess, store.hasBlockedItems, let testedID else { return }
+        scanError = nil
+        guard let id = await scanner.scan(prompt: "Hold the top of your iPhone near the tag you tested."), !Task.isCancelled else { return }
+        guard id == testedID else {
+            scanError = "Use the tag you tested. This scan does not match."
+            return
+        }
         do {
-            try store.registerTag(id, name: tagName)
+            let name = tagName.trimmingCharacters(in: .whitespacesAndNewlines)
+            try store.registerTag(id, name: name.isEmpty ? nil : name)
             #if DEBUG
             if store.isReplayingSetup {
                 try store.finishReplay()
@@ -147,6 +259,7 @@ struct OnboardingView: View {
     }
 
     private func openPicker() {
+        guard store.hasScreenTimeAccess, !store.isRequestingAuthorization else { return }
         #if DEBUG
         replayPickerProfileID = store.replayProfile?.id
         replaySelection = FamilyActivitySelection()
@@ -154,29 +267,69 @@ struct OnboardingView: View {
         picking = true
     }
 
+    private func clearTest() { firstRead = nil; testedID = nil }
+    private func startTest() { clearTest(); go(to: .test) }
+
     private func go(to next: Step) {
-        withAnimation(.smooth(duration: 0.3)) { step = next }
+        withAnimation(reduceMotion ? nil : .smooth(duration: 0.3)) { step = next }
+    }
+
+    private func tagExample(_ title: String, note text: String? = nil) -> some View {
+        Button(action: startTest) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title).foregroundStyle(Color.zoneInk)
+                if let text { note(text) }
+            }
+            .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
+            .contentShape(.rect)
+        }
+        .buttonStyle(ZoneRowStyle())
+    }
+
+    private func plainRow(_ title: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) { ZoneRow(title, value: "") }
+            .buttonStyle(ZoneRowStyle())
+    }
+
+    private func secondary(_ title: String, action: @escaping () -> Void) -> some View {
+        Button(title, action: action)
+            .font(.zone(size: 16))
+            .foregroundStyle(Color.zoneBone)
+            .frame(maxWidth: .infinity, minHeight: 48)
+            .contentShape(.rect)
+            .buttonStyle(.plain)
+    }
+
+    private func note(_ text: String) -> some View {
+        Text(text)
+            .font(.zone(size: 14))
+            .foregroundStyle(Color.zoneMute)
+            .fixedSize(horizontal: false, vertical: true)
     }
 
     private func page(
         _ title: String,
         _ text: String,
         @ViewBuilder button: () -> some View,
-        @ViewBuilder rows: () -> some View = { EmptyView() }
+        @ViewBuilder rows: @escaping () -> some View = { EmptyView() }
     ) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            ZoneTitle(title)
-            Text(text)
-                .foregroundStyle(Color.zoneMute)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.horizontal, 24)
-            rows()
-                .font(.zone(size: 17))
-                .padding(.horizontal, 24)
-                .padding(.top, 12)
-            Spacer(minLength: 24)
+        GeometryReader { geometry in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 12) {
+                    ZoneTitle(title)
+                    Text(text)
+                        .foregroundStyle(Color.zoneMute)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.horizontal, 24)
+                    rows()
+                        .font(.zone(size: 17))
+                        .padding(.horizontal, 24)
+                        .padding(.top, 12)
+                    Spacer(minLength: 24)
+                }
+                .frame(maxWidth: .infinity, minHeight: geometry.size.height, alignment: .topLeading)
+            }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .safeAreaInset(edge: .bottom) {
             button()
                 .buttonStyle(ZoneButtonStyle())

@@ -5,7 +5,6 @@ struct TagNameForm: View {
     let save: (String) -> Void
     let done: () -> Void
     @State private var name: String
-    @FocusState private var editing: Bool
 
     init(name: String?, save: @escaping (String) -> Void, done: @escaping () -> Void) {
         self.save = save
@@ -21,23 +20,9 @@ struct TagNameForm: View {
                 .foregroundStyle(Color.zoneMute)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.horizontal, 24)
-            HStack(spacing: 16) {
-                Text("Name").foregroundStyle(Color.zoneMute)
-                TextField("Desk", text: $name)
-                    .textFieldStyle(.plain)
-                    .fontWeight(.semibold)
-                    .multilineTextAlignment(.trailing)
-                    .focused($editing)
-                    .submitLabel(.done)
-                    .onSubmit(saveAndClose)
-                    .accessibilityLabel("Tag name")
-            }
-            .font(.zone(size: 17))
-            .frame(height: 52)
-            .contentShape(.rect)
-            .onTapGesture { editing = true }
-            .padding(.horizontal, 24)
-            .padding(.top, 12)
+            Field(name: $name, label: "Name", placeholder: "Desk", focusOnAppear: true, onSubmit: saveAndClose)
+                .padding(.horizontal, 24)
+                .padding(.top, 12)
             Spacer(minLength: 24)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -54,11 +39,38 @@ struct TagNameForm: View {
                 Button("Skip", action: done)
             }
         }
-        .onAppear { editing = true }
     }
 
     private func saveAndClose() {
         save(name)
         done()
+    }
+
+    struct Field: View {
+        @Binding var name: String
+        let label: String
+        let placeholder: String
+        var focusOnAppear = false
+        var onSubmit: (() -> Void)?
+        @FocusState private var editing: Bool
+
+        var body: some View {
+            HStack(spacing: 16) {
+                Text(label).foregroundStyle(Color.zoneMute)
+                TextField(placeholder, text: $name)
+                    .textFieldStyle(.plain)
+                    .fontWeight(.semibold)
+                    .multilineTextAlignment(.trailing)
+                    .focused($editing)
+                    .submitLabel(.done)
+                    .onSubmit { editing = false; onSubmit?() }
+                    .accessibilityLabel("Tag name")
+            }
+            .font(.zone(size: 17))
+            .frame(height: 52)
+            .contentShape(.rect)
+            .onTapGesture { editing = true }
+            .onAppear { if focusOnAppear { editing = true } }
+        }
     }
 }
