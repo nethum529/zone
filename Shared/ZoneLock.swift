@@ -26,6 +26,10 @@ enum ZoneLock {
         static let relockAt = "relockAt"
         static let relockMinutes = "relockMinutes"
         static let sessions = "sessions"
+        #if DEBUG
+        static let replaySetup = "debugReplaySetup"
+        static let replayProfileIDs = "debugReplayProfileIDs"
+        #endif
     }
 
     static var profiles: ZoneProfiles { ZoneProfiles.load(from: defaults) }
@@ -36,6 +40,9 @@ enum ZoneLock {
     // A new lock can choose a profile. An existing Zone keeps its profile.
     static func lock(profile id: ZoneProfile.ID? = nil, in defaults: UserDefaults = ZoneLock.defaults) {
         withStateLock {
+            #if DEBUG
+            guard !defaults.bool(forKey: Keys.replaySetup) else { return }
+            #endif
             guard defaults.object(forKey: Keys.zonedSince) == nil else { return }
             if let id {
                 var profiles = ZoneProfiles.load(from: defaults)
@@ -83,6 +90,9 @@ enum ZoneLock {
         in defaults: UserDefaults = ZoneLock.defaults
     ) -> Bool {
         withStateLock {
+            #if DEBUG
+            guard !defaults.bool(forKey: Keys.replaySetup) else { return false }
+            #endif
             guard defaults.bool(forKey: Keys.superZone),
                 defaults.object(forKey: Keys.zonedSince) == nil,
                 let relockAt = defaults.object(forKey: Keys.relockAt) as? Date,
