@@ -110,26 +110,27 @@ final class TagScanner {
     #endif
 
     // Returns nil when the scan failed or the user closed the scan sheet.
-    func scan(prompt: String = "Hold your phone near your Zone tag.") async -> String? {
+    func scan(prompt: String = "Hold your phone near your Zone tag.", reportTimeout: Bool = false) async -> String? {
         // A second tap while a scan runs does nothing.
         guard !isScanning else { return nil }
         isScanning = true
         defer { isScanning = false }
-        #if DEBUG && targetEnvironment(simulator)
-        return await simulatedScan.scan(prompt: prompt)
-        #else
         do {
+            #if DEBUG && targetEnvironment(simulator)
+            return try await simulatedScan.scan(prompt: prompt)
+            #else
             return try await reader.scan(prompt: prompt)
+            #endif
         } catch {
-            // The user closed the scan sheet, or it closed by itself. The sheet already showed this.
+            // Closing the sheet does not report an error. Card tests also need to report a timeout.
             if let nfcError = error as? NFCReaderError,
-               [.readerSessionInvalidationErrorUserCanceled, .readerSessionInvalidationErrorSessionTimeout].contains(nfcError.code) {
+               nfcError.code == .readerSessionInvalidationErrorUserCanceled
+                || (nfcError.code == .readerSessionInvalidationErrorSessionTimeout && !reportTimeout) {
                 return nil
             }
             errorMessage = error.localizedDescription
             return nil
         }
-        #endif
     }
 }
 

@@ -1,4 +1,5 @@
 #if DEBUG && targetEnvironment(simulator)
+import CoreNFC
 import Observation
 import SwiftUI
 
@@ -9,10 +10,10 @@ final class SimulatedTagScan {
     static let backupID = "SIMULATED-BACKUP-TAG"
     static let otherID = "SIMULATED-OTHER-TAG"
     var prompt: String?
-    private var continuation: CheckedContinuation<String?, Never>?
+    private var continuation: CheckedContinuation<String?, any Error>?
 
-    func scan(prompt: String) async -> String? {
-        await withCheckedContinuation { continuation in
+    func scan(prompt: String) async throws -> String? {
+        try await withCheckedThrowingContinuation { continuation in
             self.continuation = continuation
             self.prompt = prompt
         }
@@ -23,6 +24,13 @@ final class SimulatedTagScan {
         continuation = nil
         prompt = nil
         pending?.resume(returning: id)
+    }
+
+    func fail(_ error: any Error = TagReaderError.unsupportedTag) {
+        let pending = continuation
+        continuation = nil
+        prompt = nil
+        pending?.resume(throwing: error)
     }
 }
 
@@ -38,6 +46,10 @@ struct SimulatedTagScanPresenter: ViewModifier {
                 Button("Main test tag") { scan.finish(TagReader.simulatedTagID) }
                 Button("Backup test tag") { scan.finish(SimulatedTagScan.backupID) }
                 Button("Other test tag") { scan.finish(SimulatedTagScan.otherID) }
+                Button("Unreadable test tag") { scan.fail() }
+                Button("Timed out test tag") {
+                    scan.fail(NSError(domain: NFCErrorDomain, code: NFCReaderError.Code.readerSessionInvalidationErrorSessionTimeout.rawValue))
+                }
                 Button("Cancel", role: .cancel) { scan.finish(nil) }
             } message: {
                 Text(scan.prompt ?? "")

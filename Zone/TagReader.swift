@@ -13,8 +13,8 @@ enum TagReaderError: LocalizedError {
     }
 }
 
-// Reads the hardware ID of one NFC tag.
-// The ID is fixed in the tag chip, so a copy of the sticker does not unlock Zone.
+// Reads the identifier exposed by one NFC tag.
+// Some cards return a different identifier on each scan.
 final class TagReader: NSObject, NFCTagReaderSessionDelegate, @unchecked Sendable {
     // In debug builds without NFC (the simulator), a scan returns this fake ID.
     static let simulatedTagID = "SIMULATED-TAG"
