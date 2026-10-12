@@ -9,7 +9,10 @@ import Observation
 @Observable
 final class ZoneStore {
     let scheduleStore: ZoneScheduleStore
-    private(set) var authorization: AuthorizationStatus
+    private(set) var authorization: AuthorizationStatus = .notDetermined
+    private(set) var isRequestingAuthorization = false
+    private(set) var authorizationError: String?
+    var hasScreenTimeAccess: Bool { authorization == .approved && authorizationError == nil }
     let tags = ZoneTags()
     var hasTag: Bool { !tags.all.isEmpty }
     private(set) var zonedSince: Date?
@@ -59,11 +62,11 @@ final class ZoneStore {
     private typealias Keys = ZoneLock.Keys
     private let defaults: UserDefaults
     private let activityCenter = DeviceActivityCenter()
+    private var requestedAuthorization = false
 
     init(defaults: UserDefaults = ZoneLock.defaults) {
         self.defaults = defaults
         scheduleStore = ZoneScheduleStore(defaults: defaults)
-        authorization = AuthorizationCenter.shared.authorizationStatus
         superZone = defaults.bool(forKey: Keys.superZone)
         relockMinutes = defaults.object(forKey: Keys.relockMinutes) as? Int ?? 15
         profiles = ZoneProfiles.load(from: defaults)
@@ -88,21 +91,36 @@ final class ZoneStore {
         if saved != profiles { profiles = saved }
     }
 
+    // Read Screen Time after the first page can appear, not in the app's initializer.
     // iOS loads the Screen Time status a moment after launch.
     // Before that it reports notDetermined, so follow its changes.
     func watchAuthorization() async {
         for await status in AuthorizationCenter.shared.$authorizationStatus.values {
+            if status != authorization, status == .approved { authorizationError = nil }
             authorization = status
+            // A reinstall can keep the grant. Refresh it before using the picker or shields.
+            if status == .approved, !hasTag, !requestedAuthorization {
+                await requestAuthorization()
+            }
         }
     }
 
     func requestAuthorization() async {
+        guard !isRequestingAuthorization else { return }
+        isRequestingAuthorization = true
+        requestedAuthorization = true
+        authorizationError = nil
+        defer { isRequestingAuthorization = false }
         do {
             try await AuthorizationCenter.shared.requestAuthorization(for: .individual)
         } catch {
             print("Screen Time authorization failed: \(error)")
+            authorizationError = "Could not allow Screen Time access. Try again."
         }
         authorization = AuthorizationCenter.shared.authorizationStatus
+        if authorization != .approved, authorizationError == nil {
+            authorizationError = "Screen Time access was not allowed. Try again."
+        }
     }
 
     func registerTag(_ id: String, name: String?) throws {
