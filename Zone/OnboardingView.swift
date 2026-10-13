@@ -86,10 +86,10 @@ struct OnboardingView: View {
             }
         } rows: {
             VStack(spacing: 0) {
-                plainRow("NFC sticker or key fob", action: startTest)
-                plainRow("amiibo figure or card", action: startTest)
-                plainRow("Student or work ID", action: startTest)
-                plainRow("Transit or old hotel card", action: startTest)
+                ZoneRow("NFC sticker or key fob", value: "") { EmptyView() }
+                ZoneRow("amiibo figure or card", value: "") { EmptyView() }
+                ZoneRow("Student or work ID", value: "") { EmptyView() }
+                ZoneRow("Transit or old hotel card", value: "") { EmptyView() }
             }
         }
     }
