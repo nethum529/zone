@@ -206,7 +206,7 @@ struct OnboardingView: View {
             return
         }
         guard !Task.isCancelled else { return }
-        guard ids.allSatisfy({ $0 == ids[0] }) else { clearTest(); go(to: .failed(.mismatch)); return }
+        guard ids.allSatisfy({ $0 == ids[0] }), !TagReader.isRandomID(ids[0]) else { clearTest(); go(to: .failed(.mismatch)); return }
         testedID = ids[0]
         go(to: .verified)
     }

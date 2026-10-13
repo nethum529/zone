@@ -98,6 +98,13 @@ final class TagReader: NSObject, NFCTagReaderSessionDelegate, @unchecked Sendabl
         ids = []
     }
 
+    // ISO 14443-3 marks a random UID: 4 bytes with first byte 0x08.
+    // Such a card makes a new UID only after the RF field resets, so two reads in one sheet can still match.
+    // Only ISO 14443 tags have a 4-byte ID here, so the hex string is enough.
+    static func isRandomID(_ id: String) -> Bool {
+        id.count == 8 && id.hasPrefix("08")
+    }
+
     private static func identifier(of tag: NFCTag) -> String? {
         let data: Data
         switch tag {

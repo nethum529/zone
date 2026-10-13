@@ -9,6 +9,7 @@ import SwiftUI
 final class SimulatedTagScan {
     static let backupID = "SIMULATED-BACKUP-TAG"
     static let otherID = "SIMULATED-OTHER-TAG"
+    static let randomID = "08A1B2C3"
     var prompt: String?
     private(set) var reads = 1
     private var continuation: CheckedContinuation<[String]?, any Error>?
@@ -60,6 +61,7 @@ struct SimulatedTagScanPresenter: ViewModifier {
                 Button("Other test tag") { scan.finish(SimulatedTagScan.otherID) }
                 if scan.reads > 1 {
                     Button("Changing ID test tag") { scan.finishChanging() }
+                    Button("Random ID test tag") { scan.finish(SimulatedTagScan.randomID) }
                 }
                 Button("Unreadable test tag") { scan.fail() }
                 Button("Timed out test tag") {
