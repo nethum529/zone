@@ -66,7 +66,7 @@ struct SettingsView: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Keep your data. Allow Screen Time and choose apps again.")
+            Text("Keep your data and apps. Allow Screen Time again.")
         }
         .alert("Could not replay setup", isPresented: Binding(
             get: { replayError != nil }, set: { if !$0 { replayError = nil } }

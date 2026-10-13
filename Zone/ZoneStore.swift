@@ -65,11 +65,6 @@ final class ZoneStore {
     private var requestedAuthorization = false
     #if DEBUG
     private(set) var isReplayingSetup: Bool
-    private(set) var replayProfileIDs: [UUID]
-
-    var replayProfile: ZoneProfile? {
-        replayProfileIDs.first.flatMap { profiles.profile($0) }
-    }
     #endif
 
     init(defaults: UserDefaults = ZoneLock.defaults) {
@@ -80,7 +75,6 @@ final class ZoneStore {
         profiles = ZoneProfiles.load(from: defaults)
         #if DEBUG
         isReplayingSetup = defaults.bool(forKey: Keys.replaySetup)
-        replayProfileIDs = (defaults.stringArray(forKey: Keys.replayProfileIDs) ?? []).compactMap(UUID.init(uuidString:))
         #endif
         sessions = defaults.data(forKey: Keys.sessions)
             .flatMap { try? JSONDecoder().decode([ZoneSession].self, from: $0) } ?? []
@@ -152,11 +146,6 @@ final class ZoneStore {
         let wasWaitingToRelock = relockAt != nil
         let started = ZoneLock.withStateLock {
             guard defaults.object(forKey: Keys.zonedSince) == nil else { return false }
-            // Revoking access voids every app token, including those in other profiles.
-            let saved = ZoneProfiles.load(from: defaults)
-            replayProfileIDs = ([saved.current] + saved.all.filter { $0.id != saved.currentID })
-                .filter { $0.selection != FamilyActivitySelection() }.map(\.id)
-            defaults.set(replayProfileIDs.map(\.uuidString), forKey: Keys.replayProfileIDs)
             defaults.set(true, forKey: Keys.replaySetup)
             return true
         }
@@ -184,8 +173,6 @@ final class ZoneStore {
         } catch {
             authorization = AuthorizationCenter.shared.authorizationStatus
             if authorization == .approved {
-                replayProfileIDs = []
-                defaults.removeObject(forKey: Keys.replayProfileIDs)
                 do {
                     try restoreReplayMonitoring()
                     if superZone, wasWaitingToRelock { scheduleRelock() }
@@ -200,18 +187,9 @@ final class ZoneStore {
         }
     }
 
-    func renewReplaySelection(_ selection: FamilyActivitySelection, for id: UUID) {
-        guard replayProfileIDs.contains(id), selection != FamilyActivitySelection() else { return }
-        ZoneLock.withStateLock {
-            profiles.setSelection(selection, for: id)
-            replayProfileIDs.removeAll { $0 == id }
-            defaults.set(replayProfileIDs.map(\.uuidString), forKey: Keys.replayProfileIDs)
-        }
-    }
-
     func finishReplay() throws {
-        guard hasScreenTimeAccess, replayProfileIDs.isEmpty else {
-            throw ScheduleError(message: "Choose apps again before you continue.")
+        guard hasScreenTimeAccess else {
+            throw ScheduleError(message: "Allow Screen Time access before you continue.")
         }
         try restoreReplayMonitoring()
         enterZone()
@@ -225,10 +203,7 @@ final class ZoneStore {
                 during: ZoneScheduleRuntime.deviceSchedule(for: schedule)
             )
         }
-        ZoneLock.withStateLock {
-            defaults.removeObject(forKey: Keys.replaySetup)
-            defaults.removeObject(forKey: Keys.replayProfileIDs)
-        }
+        ZoneLock.withStateLock { defaults.removeObject(forKey: Keys.replaySetup) }
         isReplayingSetup = false
     }
     #endif

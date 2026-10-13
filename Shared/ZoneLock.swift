@@ -28,7 +28,6 @@ enum ZoneLock {
         static let sessions = "sessions"
         #if DEBUG
         static let replaySetup = "debugReplaySetup"
-        static let replayProfileIDs = "debugReplayProfileIDs"
         #endif
     }
 
