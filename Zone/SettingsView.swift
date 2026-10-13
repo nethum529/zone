@@ -59,14 +59,12 @@ struct SettingsView: View {
         #if DEBUG
         .confirmationDialog("Replay setup?", isPresented: $confirmingReplay, titleVisibility: .visible) {
             Button("Replay setup") {
-                Task {
-                    do { try await store.replaySetup() }
-                    catch { replayError = error.localizedDescription }
-                }
+                do { try store.replaySetup() }
+                catch { replayError = error.localizedDescription }
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Keep your data and apps. Allow Screen Time again.")
+            Text("Keep your data, apps and Screen Time access.")
         }
         .alert("Could not replay setup", isPresented: Binding(
             get: { replayError != nil }, set: { if !$0 { replayError = nil } }

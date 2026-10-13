@@ -140,51 +140,21 @@ final class ZoneStore {
     }
 
     #if DEBUG
-    func replaySetup() async throws {
+    func replaySetup() throws {
         guard !isRequestingAuthorization else { return }
         refresh()
-        let wasWaitingToRelock = relockAt != nil
         let started = ZoneLock.withStateLock {
             guard defaults.object(forKey: Keys.zonedSince) == nil else { return false }
             defaults.set(true, forKey: Keys.replaySetup)
             return true
         }
         guard started else { throw ScheduleError(message: "Leave the Zone to replay setup.") }
-        isRequestingAuthorization = true
+        // Keep Screen Time access. Revoking it voids every saved app token.
         isReplayingSetup = true
-        authorization = .notDetermined
         activityCenter.stopMonitoring()
         cancelRelock()
         ZoneLock.shields.clearAllSettings()
         ZoneLock.removeReminder()
-        defer { isRequestingAuthorization = false }
-        do {
-            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in
-                AuthorizationCenter.shared.revokeAuthorization { @Sendable result in
-                    continuation.resume(with: result)
-                }
-            }
-            authorization = AuthorizationCenter.shared.authorizationStatus
-            guard authorization != .approved else {
-                throw ScheduleError(message: "Screen Time access is still allowed. Try again.")
-            }
-            requestedAuthorization = false
-            authorizationError = nil
-        } catch {
-            authorization = AuthorizationCenter.shared.authorizationStatus
-            if authorization == .approved {
-                do {
-                    try restoreReplayMonitoring()
-                    if superZone, wasWaitingToRelock { scheduleRelock() }
-                    refresh()
-                } catch {
-                    authorizationError = "Could not restore schedules. Allow Screen Time access to try again."
-                }
-            } else {
-                authorizationError = "Could not replay setup. Allow Screen Time access to continue."
-            }
-            throw error
-        }
     }
 
     func finishReplay() throws {
