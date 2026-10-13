@@ -57,12 +57,15 @@ final class TagReader: NSObject, NFCTagReaderSessionDelegate, @unchecked Sendabl
 
     func tagReaderSessionDidBecomeActive(_ session: NFCTagReaderSession) {}
 
+    // A closed session reports its end late, often after the next scan starts.
+    // Only the current session can finish a scan, so a late report does not cancel the next one.
     func tagReaderSession(_ session: NFCTagReaderSession, didInvalidateWithError error: Error) {
+        guard session === self.session else { return }
         finish(.failure(error))
     }
 
     func tagReaderSession(_ session: NFCTagReaderSession, didDetect tags: [NFCTag]) {
-        guard let tag = tags.first else { return }
+        guard session === self.session, let tag = tags.first else { return }
         guard let id = Self.identifier(of: tag) else {
             session.invalidate(errorMessage: TagReaderError.unsupportedTag.localizedDescription)
             finish(.failure(TagReaderError.unsupportedTag))
