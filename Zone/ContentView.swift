@@ -110,16 +110,25 @@ final class TagScanner {
     #endif
 
     // Returns nil when the scan failed or the user closed the scan sheet.
-    func scan(prompt: String = "Hold your phone near your Zone tag.", reportTimeout: Bool = false) async -> String? {
+    func scan(prompt: String = "Hold your phone near your Zone tag.") async -> String? {
+        await scan(prompt: prompt, reads: 1, reportTimeout: false)?.first
+    }
+
+    // Reads the tag twice in one sheet. Card tests also report a timeout.
+    func scanTwice(prompt: String) async -> [String]? {
+        await scan(prompt: prompt, reads: 2, reportTimeout: true)
+    }
+
+    private func scan(prompt: String, reads: Int, reportTimeout: Bool) async -> [String]? {
         // A second tap while a scan runs does nothing.
         guard !isScanning else { return nil }
         isScanning = true
         defer { isScanning = false }
         do {
             #if DEBUG && targetEnvironment(simulator)
-            return try await simulatedScan.scan(prompt: prompt)
+            return try await simulatedScan.scan(prompt: prompt, reads: reads)
             #else
-            return try await reader.scan(prompt: prompt)
+            return try await reader.scan(prompt: prompt, reads: reads)
             #endif
         } catch {
             // Closing the sheet does not report an error. Card tests also need to report a timeout.
