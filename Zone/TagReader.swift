@@ -20,13 +20,17 @@ final class TagReader: NSObject, NFCTagReaderSessionDelegate, @unchecked Sendabl
     static let simulatedTagID = "SIMULATED-TAG"
 
     private var session: NFCTagReaderSession?
-    private var continuation: CheckedContinuation<String, Error>?
+    private var continuation: CheckedContinuation<[String], Error>?
+    private var reads = 1
+    private var ids: [String] = []
 
+    // Reads the same tag the given number of times in one sheet and returns each ID.
+    // A card test reads twice to find cards that show a new ID at each read.
     @MainActor
-    func scan(prompt: String) async throws -> String {
+    func scan(prompt: String, reads: Int) async throws -> [String] {
         guard NFCTagReaderSession.readingAvailable else {
             #if DEBUG && targetEnvironment(simulator)
-            return Self.simulatedTagID
+            return Array(repeating: Self.simulatedTagID, count: reads)
             #else
             throw TagReaderError.unavailable
             #endif
@@ -36,7 +40,7 @@ final class TagReader: NSObject, NFCTagReaderSessionDelegate, @unchecked Sendabl
         var attempt = 1
         while true {
             do {
-                return try await read(prompt: prompt)
+                return try await read(prompt: prompt, reads: reads)
             } catch let error as NFCReaderError where error.code == .readerSessionInvalidationErrorSystemIsBusy && attempt < 5 {
                 attempt += 1
                 try await Task.sleep(for: .milliseconds(400))
@@ -45,9 +49,11 @@ final class TagReader: NSObject, NFCTagReaderSessionDelegate, @unchecked Sendabl
     }
 
     @MainActor
-    private func read(prompt: String) async throws -> String {
+    private func read(prompt: String, reads: Int) async throws -> [String] {
         try await withCheckedThrowingContinuation { continuation in
             self.continuation = continuation
+            self.reads = reads
+            ids = []
             let session = NFCTagReaderSession(pollingOption: [.iso14443, .iso15693], delegate: self, queue: nil)
             session?.alertMessage = prompt
             self.session = session
@@ -71,17 +77,32 @@ final class TagReader: NSObject, NFCTagReaderSessionDelegate, @unchecked Sendabl
             finish(.failure(TagReaderError.unsupportedTag))
             return
         }
+        ids.append(id)
+        // Poll again in the same sheet to read the tag one more time.
+        // A tag that stays near the iPhone is found again.
+        guard ids.count == reads else {
+            session.restartPolling()
+            return
+        }
         // The ID is known when the tag is detected, so close the sheet at once.
         // A connect to the tag first only makes the sheet stay longer.
         session.alertMessage = "Tag read."
         session.invalidate()
-        finish(.success(id))
+        finish(.success(ids))
     }
 
-    private func finish(_ result: Result<String, Error>) {
+    private func finish(_ result: Result<[String], Error>) {
         continuation?.resume(with: result)
         continuation = nil
         session = nil
+        ids = []
+    }
+
+    // ISO 14443-3 marks a random UID: 4 bytes with first byte 0x08.
+    // Such a card makes a new UID only after the RF field resets, so two reads in one sheet can still match.
+    // Only ISO 14443 tags have a 4-byte ID here, so the hex string is enough.
+    static func isRandomID(_ id: String) -> Bool {
+        id.count == 8 && id.hasPrefix("08")
     }
 
     private static func identifier(of tag: NFCTag) -> String? {

@@ -9,7 +9,6 @@ struct OnboardingView: View {
     @State private var scanner = TagScanner()
     @State private var scanning = false
     @State private var picking = false
-    @State private var firstRead: String?
     @State private var testedID: String?
     @State private var tagName = ""
     @State private var scanError: String?
@@ -95,17 +94,14 @@ struct OnboardingView: View {
     }
 
     private var cardTest: some View {
-        page(firstRead == nil ? "Test your card" : "Scan it again",
-             firstRead == nil
-             ? "Hold one card near the top of your iPhone. This test does not block apps or change the card."
-             : "Move the card away from your iPhone, then scan the same card again.") {
-            Button(firstRead == nil ? "Scan card" : "Scan again") { scanning = true }
+        page("Test your card", "Hold one card near the top of your iPhone. This test does not block apps or change the card.") {
+            Button("Scan card") { scanning = true }
                 .disabled(scanning)
         }
     }
 
     private var verified: some View {
-        page("This tag is ready", "Both scans matched. Keep this tag. You will use it to leave a Zone.") {
+        page("This tag is ready", "It read the same ID each time. Keep this tag. You will use it to leave a Zone.") {
             Button("Continue") { go(to: .access) }
         } rows: {
             plainRow("Test another card", action: startTest)
@@ -113,9 +109,9 @@ struct OnboardingView: View {
     }
 
     private func failed(_ reason: TestFailure) -> some View {
-        page(reason == .mismatch ? "The scans did not match" : "Could not read this card",
+        page(reason == .mismatch ? "This card changes its ID" : "Could not read this card",
              reason == .mismatch
-             ? "Use the same card for both scans. If it still fails, try another tag."
+             ? "This card shows a new ID at each read, so Zone cannot use it. Try another tag."
              : "Hold one card near the top of your iPhone and try again. Some cards cannot be read.") {
             Button("Try again", action: startTest)
         } rows: {
@@ -200,7 +196,8 @@ struct OnboardingView: View {
 
     private func testCard() async {
         scanner.errorMessage = nil
-        guard let id = await scanner.scan(prompt: "Hold the top of your iPhone near one card or tag.", reportTimeout: true) else {
+        // One sheet reads the card twice. Zone matches the ID, so the ID must stay the same.
+        guard let ids = await scanner.scanTwice(prompt: "Hold the top of your iPhone near one card or tag.") else {
             if scanner.errorMessage != nil {
                 scanner.errorMessage = nil
                 clearTest()
@@ -209,9 +206,8 @@ struct OnboardingView: View {
             return
         }
         guard !Task.isCancelled else { return }
-        guard let firstRead else { self.firstRead = id; return }
-        guard firstRead == id else { clearTest(); go(to: .failed(.mismatch)); return }
-        testedID = id
+        guard ids.allSatisfy({ $0 == ids[0] }), !TagReader.isRandomID(ids[0]) else { clearTest(); go(to: .failed(.mismatch)); return }
+        testedID = ids[0]
         go(to: .verified)
     }
 
@@ -254,7 +250,7 @@ struct OnboardingView: View {
         picking = true
     }
 
-    private func clearTest() { firstRead = nil; testedID = nil }
+    private func clearTest() { testedID = nil }
     private func startTest() { clearTest(); go(to: .test) }
 
     private func go(to next: Step) {
