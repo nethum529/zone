@@ -12,7 +12,6 @@ struct OnboardingView: View {
     @State private var firstRead: String?
     @State private var testedID: String?
     @State private var tagName = ""
-    @State private var showingTagHelp = false
     @State private var scanError: String?
     #if DEBUG
     @State private var replaySelection = FamilyActivitySelection()
@@ -87,10 +86,10 @@ struct OnboardingView: View {
             }
         } rows: {
             VStack(spacing: 0) {
-                tagExample("NFC sticker or key fob", note: "NTAG213 or NTAG215")
-                tagExample("amiibo figure or card")
-                tagExample("Student or work ID", note: "Some cards work. Test yours.")
-                tagExample("Transit or old hotel card", note: "Some cards work. Test yours.")
+                plainRow("NFC sticker or key fob", action: startTest)
+                plainRow("amiibo figure or card", action: startTest)
+                plainRow("Student or work ID", action: startTest)
+                plainRow("Transit or old hotel card", action: startTest)
             }
         }
     }
@@ -122,7 +121,6 @@ struct OnboardingView: View {
         } rows: {
             VStack(alignment: .leading, spacing: 12) {
                 plainRow("Try another card", action: startTest)
-                note("Need a tag? A 10-pack of NTAG215 tags is about $7 on Amazon, before shipping and tax. Prices can change.")
                 Link(destination: amazonTags) { ZoneRow("Find tags on Amazon", value: "") }
                     .buttonStyle(ZoneRowStyle())
             }
@@ -134,17 +132,6 @@ struct OnboardingView: View {
             VStack(spacing: 12) {
                 Link("Find tags on Amazon", destination: amazonTags)
                 secondary("I have a tag to test", action: startTest)
-            }
-        } rows: {
-            VStack(alignment: .leading, spacing: 12) {
-                Button { showingTagHelp.toggle() } label: {
-                    ZoneRow("How the tag works", value: showingTagHelp ? "Close" : "Read")
-                }
-                .buttonStyle(ZoneRowStyle())
-                if showingTagHelp {
-                    note("Scan once to start blocking. Scan the same tag again to leave. Zone does not write to the tag.")
-                }
-                note("Choose NTAG213 or NTAG215. No programming is needed.")
             }
         }
     }
@@ -274,18 +261,6 @@ struct OnboardingView: View {
         withAnimation(reduceMotion ? nil : .smooth(duration: 0.3)) { step = next }
     }
 
-    private func tagExample(_ title: String, note text: String? = nil) -> some View {
-        Button(action: startTest) {
-            VStack(alignment: .leading, spacing: 3) {
-                Text(title).foregroundStyle(Color.zoneInk)
-                if let text { note(text) }
-            }
-            .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
-            .contentShape(.rect)
-        }
-        .buttonStyle(ZoneRowStyle())
-    }
-
     private func plainRow(_ title: String, action: @escaping () -> Void) -> some View {
         Button(action: action) { ZoneRow(title, value: "") }
             .buttonStyle(ZoneRowStyle())
@@ -298,13 +273,6 @@ struct OnboardingView: View {
             .frame(maxWidth: .infinity, minHeight: 48)
             .contentShape(.rect)
             .buttonStyle(.plain)
-    }
-
-    private func note(_ text: String) -> some View {
-        Text(text)
-            .font(.zone(size: 14))
-            .foregroundStyle(Color.zoneMute)
-            .fixedSize(horizontal: false, vertical: true)
     }
 
     private func page(
