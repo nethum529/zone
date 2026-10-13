@@ -12,10 +12,6 @@ struct OnboardingView: View {
     @State private var testedID: String?
     @State private var tagName = ""
     @State private var scanError: String?
-    #if DEBUG
-    @State private var replaySelection = FamilyActivitySelection()
-    @State private var replayPickerProfileID: UUID?
-    #endif
 
     private enum Step { case ready, test, verified, failed(TestFailure), purchase, access, profile, scan }
     private enum TestFailure { case unreadable, mismatch }
@@ -56,19 +52,10 @@ struct OnboardingView: View {
             }
         }
         .tint(Color.zoneBone)
-        .familyActivityPicker(isPresented: $picking, selection: pickerSelection)
+        .familyActivityPicker(isPresented: $picking, selection: Binding(get: { store.selection }, set: { store.selection = $0 }))
         .onChange(of: store.hasScreenTimeAccess) { _, allowed in
             if allowed, case .access = step { go(to: .profile) }
         }
-        #if DEBUG
-        .onChange(of: picking) { _, shown in
-            if !shown, let id = replayPickerProfileID {
-                store.renewReplaySelection(replaySelection, for: id)
-                replayPickerProfileID = nil
-                replaySelection = FamilyActivitySelection()
-            }
-        }
-        #endif
         .tagScanAlert(scanner)
         .task(id: scanning) {
             guard scanning else { return }
@@ -152,26 +139,7 @@ struct OnboardingView: View {
         }
     }
 
-    @ViewBuilder private var profile: some View {
-        #if DEBUG
-        if let saved = store.replayProfile {
-            page(saved.name, "Screen Time cleared app access. Choose this profile's apps again.") {
-                Button("Choose apps", action: openPicker)
-                    .disabled(store.isRequestingAuthorization)
-            } rows: {
-                Button(action: openPicker) { ZoneRow("Blocked apps", value: appsText(saved.selection)) }
-                    .buttonStyle(ZoneRowStyle())
-                    .disabled(store.isRequestingAuthorization)
-            }
-        } else {
-            firstProfile
-        }
-        #else
-        firstProfile
-        #endif
-    }
-
-    private var firstProfile: some View {
+    private var profile: some View {
         page("Choose your distractions", "Pick the apps you want to block. Social is a good start.") {
             Button(store.isRequestingAuthorization ? "Waiting for Screen Time..." : (store.hasBlockedItems ? "Continue" : "Choose apps")) {
                 if store.hasBlockedItems { go(to: .scan) } else { openPicker() }
@@ -234,19 +202,8 @@ struct OnboardingView: View {
         }
     }
 
-    private var pickerSelection: Binding<FamilyActivitySelection> {
-        #if DEBUG
-        if replayPickerProfileID != nil { return $replaySelection }
-        #endif
-        return Binding(get: { store.selection }, set: { store.selection = $0 })
-    }
-
     private func openPicker() {
         guard store.hasScreenTimeAccess, !store.isRequestingAuthorization else { return }
-        #if DEBUG
-        replayPickerProfileID = store.replayProfile?.id
-        replaySelection = FamilyActivitySelection()
-        #endif
         picking = true
     }
 
